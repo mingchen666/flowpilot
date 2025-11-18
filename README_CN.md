@@ -10,11 +10,15 @@
 [![Next.js](https://img.shields.io/badge/Next.js-15.x-black)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue)](https://www.typescriptlang.org/)
 
+![FlowPilot 横幅](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:3167188162034564394fcABjnTyDXj_V_VNLfgLHM-YD:1763384369107)
+
 </div>
 
 ## 🎯 FlowPilot 是什么？
 
 **FlowPilot** 是一款基于大语言模型的流程图工具，主打"边聊边画"的体验。通过自然语言对话，实时生成专业的 draw.io 图表。
+
+> 基于 [next-ai-draw-io](https://github.com/DayuanJiang/next-ai-draw-io) vibe coding 完成
 
 ### ✨ 核心特性
 
@@ -30,14 +34,64 @@
 ### 主工作区
 ![工作区](./public/example.png)
 
+### 功能 1：对话式生成 + 实时预览
+
+| 初始请求："请随便画一只猫咪" | 追加内容："在旁边再画一只小狗" |
+|----------------------------|----------------------------|
+| ![猫咪](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:-3005920242718049600fcABjnTyDXj_V_VNLfgLHM-YD:1763384369108) | ![猫和狗](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:3228178480041103531fcABjnTyDXj_V_VNLfgLHM-YD:1763384369108) |
+
+### 功能 2：风格复制
+
+| 原始参考图 | AI 生成同风格图表 |
+|-----------|------------------|
+| ![原图](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:2088457989885341663fcABjnTyDXj_V_VNLfgLHM-YD:1763384369108) | ![复制风格](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:-3429045031859737651fcABjnTyDXj_V_VNLfgLHM-YD:1763384369108) |
+
+### 功能 3：FlowPilot Brief - 风格配置
+
+![FlowBrief 配置](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:5076325540898615997fcABjnTyDXj_V_VNLfgLHM-YD:1763384369108)
+
+| 正式时序图 | 草绘时序图 |
+|-----------|-----------|
+| ![正式](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:-6544881212478781000fcABjnTyDXj_V_VNLfgLHM-YD:1763384369108) | ![草稿](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:1836148692676380082fcABjnTyDXj_V_VNLfgLHM-YD:1763384369109) |
+
+### 功能 4：模型对比生成 - 5 个模型同时 PK
+
+| 模型选择 | 对比结果 |
+|---------|---------|
+| ![模型配置](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:-1862551751719320689fcABjnTyDXj_V_VNLfgLHM-YD:1763384369109) | ![对比](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:-3112982623129742660fcABjnTyDXj_V_VNLfgLHM-YD:1763384369109) |
+
+### 功能 5：第三方模型配置
+
+![模型配置](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:-8733473680767249177fcABjnTyDXj_V_VNLfgLHM-YD:1763384369109)
+
+### 功能 6：PPT 生成器（Beta）
+
+| PPT 输入 | 生成的幻灯片 |
+|---------|-------------|
+| ![PPT 输入](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:7228850631256574744fcABjnTyDXj_V_VNLfgLHM-YD:1763384369109) | ![PPT 输出](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:1692396851258385169fcABjnTyDXj_V_VNLfgLHM-YD:1763384369109) |
+
+### 实际生成案例展示
+
+<div align="center">
+
+| 示例 1 | 示例 2 |
+|--------|--------|
+| ![案例 1](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:1888198707985133685fcABjnTyDXj_V_VNLfgLHM-YD:1763384369109) | ![案例 2](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:3796899254975046411fcABjnTyDXj_V_VNLfgLHM-YD:1763384369109) |
+| ![案例 3](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:1437829768119417425fcABjnTyDXj_V_VNLfgLHM-YD:1763384369109) | ![案例 4](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:4769143755415665585fcABjnTyDXj_V_VNLfgLHM-YD:1763384369109) |
+| ![案例 5](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:-7728609183008724058fcABjnTyDXj_V_VNLfgLHM-YD:1763384369109) | ![案例 6](https://docs.corp.kuaishou.com/image/api/external/load/out?code=fcABjnTyDXj_V_VNLfgLHM-YD:-4075463795420338805fcABjnTyDXj_V_VNLfgLHM-YD:1763384369109) |
+
+</div>
+
 ### 架构图示例
 ![架构图](./public/architecture.png)
+
+*这张图也是用 FlowPilot 生成的！*
 
 ## 🚀 快速开始
 
 ### 环境要求
 
-- Node.js 18+ 
+- Node.js 18+
 - pnpm（推荐）或 npm
 - 任一支持的大模型 API Key
 
@@ -97,9 +151,9 @@ pnpm start
 
 1. 点击右上角的 **"模型配置"** 按钮
 2. 填写模型服务商信息：
-   - **Base URL**: API 端点地址（如 `https://api.openai.com/v1`）
-   - **API Key**: 你的认证密钥
-   - **Model ID**: 模型标识符（如 `gpt-4`, `claude-3-opus`）
+    - **Base URL**: API 端点地址（如 `https://api.openai.com/v1`）
+    - **API Key**: 你的认证密钥
+    - **Model ID**: 模型标识符（如 `gpt-4`, `claude-3-opus`）
 
 ### 步骤 2 - 设置偏好（可选）
 
@@ -134,12 +188,12 @@ pnpm start
 - **语言**: TypeScript 5
 - **样式**: Tailwind CSS 4
 - **AI SDK**: Vercel AI SDK
-- **大模型提供商**: 
-  - OpenAI (GPT-4, GPT-3.5)
-  - Anthropic Claude
-  - Google Gemini
-  - Amazon Bedrock
-  - OpenRouter
+- **大模型提供商**:
+    - OpenAI (GPT-4, GPT-3.5)
+    - Anthropic Claude
+    - Google Gemini
+    - Amazon Bedrock
+    - OpenRouter
 - **图表引擎**: react-drawio
 - **UI 组件**: Radix UI
 - **状态管理**: React Context
@@ -149,7 +203,7 @@ pnpm start
 FlowPilot 原生支持多个大模型服务商：
 
 | 服务商 | 模型 | 说明 |
-|-------|------|
+|-------|------|------|
 | OpenAI | GPT-4, GPT-3.5 Turbo | 推荐用于一般场景 |
 | Anthropic | Claude 3 (Opus, Sonnet, Haiku) | 适合复杂图表 |
 | Google | Gemini Pro, Gemini Pro Vision | 擅长处理图片参考 |
@@ -208,7 +262,7 @@ FlowPilot 在每次调用大模型前都会把「Brief」里配置的提示词�
 
 - **意图清晰**: 告诉模型你的业务场景、期望的图表类型和角色
 - **素材多样**: 可以直接粘贴 draw.io XML、Mermaid、PlantUML、代码等作为参考
-- **渐进式优化**对话，如"保持节点不变只美化布局"、"把泳道改成竖向"
+- **渐进式优化**: 继续对话，如"保持节点不变只美化布局"、"把泳道改成竖向"
 
 ### 常用场景示例
 
