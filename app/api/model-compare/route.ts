@@ -93,7 +93,8 @@ async function exportDiagramPreview(xml: string): Promise<{
         params.set("h", "600");
         params.set("xml", xml);
 
-        const response = await fetch("https://app.diagrams.net/export3", {
+        const drawioBaseUrl = process.env.NEXT_PUBLIC_DRAWIO_BASE_URL || "https://app.diagrams.net";
+        const response = await fetch(`${drawioBaseUrl}/export3`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/x-www-form-urlencoded",

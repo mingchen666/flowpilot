@@ -18,7 +18,9 @@ const requestSchema = z.object({
     slides: z.array(slideSchema).min(1),
 });
 
-const CONVERT_ENDPOINT = "https://convert.diagrams.net/export";
+const CONVERT_ENDPOINT = 
+    process.env.NEXT_PUBLIC_DRAWIO_CONVERT_URL || 
+    "https://convert.diagrams.net/export";
 
 function encodeRFC5987ValueChars(str: string) {
     return encodeURIComponent(str)
