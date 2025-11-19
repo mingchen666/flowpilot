@@ -97,87 +97,87 @@ export default function Home() {
             <WorkspaceNav />
             <div
                 className={cn(
-                    "flex-1 lg:grid",
+                    "flex-1 min-h-0 lg:grid",
                     desktopGridCols
                 )}
             >
                 <div className="relative h-full min-h-0 p-1">
-                <div
-                    className={cn(
-                        "pointer-events-none",
-                        isChatVisible
-                            ? "absolute right-4 top-4 z-30"
-                            : "fixed right-6 top-24 z-40"
-                    )}
-                >
-                    <button
-                        type="button"
-                        aria-label={isChatVisible ? t("workspace.focusCanvas") : t("workspace.showChat")}
-                        onClick={() => setIsChatVisible((prev) => !prev)}
+                    <div
                         className={cn(
-                            "pointer-events-auto inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition",
+                            "pointer-events-none",
                             isChatVisible
-                                ? "border-gray-200 bg-white/90 text-gray-700 shadow-sm hover:bg-white"
-                                : "border-blue-500 bg-blue-600 text-white shadow-lg hover:bg-blue-500/90"
+                                ? "absolute right-4 top-4 z-30"
+                                : "fixed right-6 top-24 z-40"
                         )}
                     >
-                        {isChatVisible ? (
-                            <>
-                                <Minimize2 className="h-3.5 w-3.5" />
-                                {t("workspace.focusCanvas")}
-                            </>
-                        ) : (
-                            <>
-                                <MessageSquare className="h-3.5 w-3.5" />
-                                {t("workspace.showChat")}
-                            </>
-                        )}
-                    </button>
-                </div>
-                {drawioError ? (
-                    <div className="flex items-center justify-center h-full bg-white rounded border-2 border-red-200">
-                        <div className="text-center p-8 max-w-md">
-                            <h2 className="text-xl font-semibold text-red-600 mb-4">
-                                {t("drawio.loadFailed")}
-                            </h2>
-                            <p className="text-gray-700 mb-4">{drawioError}</p>
-                            <div className="text-sm text-gray-600 text-left bg-gray-50 p-4 rounded">
-                                <p className="font-semibold mb-2">{t("drawio.solutions")}</p>
-                                <ol className="list-decimal list-inside space-y-1">
-                                    <li>{t("drawio.solution1")}</li>
-                                    <li>{t("drawio.solution2")}</li>
-                                    <li className="ml-4 font-mono text-xs bg-white p-2 rounded mt-2">
-                                        NEXT_PUBLIC_DRAWIO_BASE_URL=https://app.diagrams.net
-                                    </li>
-                                    <li>{t("drawio.solution3")}</li>
-                                </ol>
-                            </div>
-                        </div>
+                        <button
+                            type="button"
+                            aria-label={isChatVisible ? t("workspace.focusCanvas") : t("workspace.showChat")}
+                            onClick={() => setIsChatVisible((prev) => !prev)}
+                            className={cn(
+                                "pointer-events-auto inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition",
+                                isChatVisible
+                                    ? "border-gray-200 bg-white/90 text-gray-700 shadow-sm hover:bg-white"
+                                    : "border-blue-500 bg-blue-600 text-white shadow-lg hover:bg-blue-500/90"
+                            )}
+                        >
+                            {isChatVisible ? (
+                                <>
+                                    <Minimize2 className="h-3.5 w-3.5" />
+                                    {t("workspace.focusCanvas")}
+                                </>
+                            ) : (
+                                <>
+                                    <MessageSquare className="h-3.5 w-3.5" />
+                                    {t("workspace.showChat")}
+                                </>
+                            )}
+                        </button>
                     </div>
-                ) : (
-                    <>
-                        {isDrawioLoading && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
-                                <div className="text-center">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                                    <p className="text-gray-600">{t("drawio.loadingEditor")}</p>
+                    {drawioError ? (
+                        <div className="flex items-center justify-center h-full bg-white rounded border-2 border-red-200">
+                            <div className="text-center p-8 max-w-md">
+                                <h2 className="text-xl font-semibold text-red-600 mb-4">
+                                    {t("drawio.loadFailed")}
+                                </h2>
+                                <p className="text-gray-700 mb-4">{drawioError}</p>
+                                <div className="text-sm text-gray-600 text-left bg-gray-50 p-4 rounded">
+                                    <p className="font-semibold mb-2">{t("drawio.solutions")}</p>
+                                    <ol className="list-decimal list-inside space-y-1">
+                                        <li>{t("drawio.solution1")}</li>
+                                        <li>{t("drawio.solution2")}</li>
+                                        <li className="ml-4 font-mono text-xs bg-white p-2 rounded mt-2">
+                                            NEXT_PUBLIC_DRAWIO_BASE_URL=https://app.diagrams.net
+                                        </li>
+                                        <li>{t("drawio.solution3")}</li>
+                                    </ol>
                                 </div>
                             </div>
-                        )}
-                        <DrawIoEmbed
-                            ref={drawioRef}
-                            baseUrl={drawioBaseUrl}
-                            onExport={handleDiagramExport}
-                            onLoad={handleDrawioLoad}
-                            urlParameters={{
-                                spin: true,
-                                libraries: false,
-                                saveAndExit: false,
-                                noExitBtn: true,
-                            }}
-                        />
-                    </>
-                )}
+                        </div>
+                    ) : (
+                        <>
+                            {isDrawioLoading && (
+                                <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
+                                    <div className="text-center">
+                                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                                        <p className="text-gray-600">{t("drawio.loadingEditor")}</p>
+                                    </div>
+                                </div>
+                            )}
+                            <DrawIoEmbed
+                                ref={drawioRef}
+                                baseUrl={drawioBaseUrl}
+                                onExport={handleDiagramExport}
+                                onLoad={handleDrawioLoad}
+                                urlParameters={{
+                                    spin: true,
+                                    libraries: false,
+                                    saveAndExit: false,
+                                    noExitBtn: true,
+                                }}
+                            />
+                        </>
+                    )}
                 </div>
                 <div
                     className={cn(
