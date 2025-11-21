@@ -726,14 +726,14 @@ export default function ChatPanelOptimized({
         }
 
         // 用户可见的校准请求消息
-        const userVisibleMessage = 
+        const userVisibleMessage =
             "🎯 启动 AI 校准\n\n" +
             "请优化当前流程图的布局：\n" +
             "• 保持所有节点和内容不变\n" +
             "• 优化节点位置和间距\n" +
             "• 整理连接线路径\n" +
             "• 使用 edit_diagram 工具进行批量调整";
-        const streamingFlag = renderMode === "svg" ? false : selectedModel?.isStreaming ?? false;
+        const streamingFlag = selectedModel?.isStreaming ?? false;
 
         await sendMessage(
             {
