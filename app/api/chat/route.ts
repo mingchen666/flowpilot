@@ -147,18 +147,12 @@ Render mode: ${outputMode === "svg" ? "svg-only" : "drawio-xml"}`;
       return content;
     };
 
-    let enhancedMessages = modelMessages.map((msg) => {
-      if (msg.role === 'tool') {
+    let enhancedMessages = modelMessages.map((msg): any => {
+      if ((msg as any).role === "tool") {
         return msg;
       }
-
-      if (!("content" in msg)) {
-        return { ...msg, content: sanitizeContent((msg as any).content) };
-      }
-      return {
-        ...msg,
-        content: sanitizeContent((msg as any).content),
-      };
+      const safeContent = sanitizeContent((msg as any).content);
+      return { ...(msg as any), content: safeContent };
     });
 
     // Update the last message with formatted content if it's a user message
@@ -202,7 +196,7 @@ Render mode: ${outputMode === "svg" ? "svg-only" : "drawio-xml"}`;
     // 根据 enableStreaming 决定使用流式或非流式
     const useStreaming = enableStreaming ?? true; // 默认使用流式
 
-    const commonConfig = {
+    const commonConfig: any = {
       // model: google("gemini-2.5-flash-preview-05-20"),
       // model: google("gemini-2.5-pro"),
       system: systemMessage,
@@ -350,7 +344,7 @@ IMPORTANT: Keep edits concise:
     // 根据 enableStreaming 决定使用流式或非流式
     if (enableStreaming) {
       // 流式响应
-      const result = await streamText(commonConfig);
+      const result = await streamText(commonConfig as any);
 
       return result.toUIMessageStreamResponse({
         onError: errorHandler,
@@ -408,7 +402,7 @@ IMPORTANT: Keep edits concise:
       // 非流式响应 - 使用 generateText
       // 注意：非流式模式下不自动执行工具调用，让客户端处理
       // 这样可以保持与流式模式一致的体验
-      const result = await generateText(commonConfig);
+      const result = await generateText(commonConfig as any);
 
       const endTime = Date.now();
       const durationMs = endTime - startTime;
