@@ -69,35 +69,64 @@ const TOOL_CONFIG: Array<{
 const GRID_SIZE = 12;
 
 function getBounds(element: SvgElement): { x: number; y: number; width: number; height: number } | null {
+    const applyTransform = (
+        bounds: { x: number; y: number; width: number; height: number },
+        transform?: { x?: number; y?: number; scaleX?: number; scaleY?: number }
+    ) => {
+        if (!transform) return bounds;
+        const scaleX = transform.scaleX ?? 1;
+        const scaleY = transform.scaleY ?? transform.scaleX ?? 1;
+        return {
+            x: (bounds.x + (transform.x ?? 0)) * scaleX,
+            y: (bounds.y + (transform.y ?? 0)) * scaleY,
+            width: bounds.width * scaleX,
+            height: bounds.height * scaleY,
+        };
+    };
+
     switch (element.type) {
         case "rect":
-            return {
-                x: element.x,
-                y: element.y,
-                width: element.width,
-                height: element.height,
-            };
+            return applyTransform(
+                {
+                    x: element.x,
+                    y: element.y,
+                    width: element.width,
+                    height: element.height,
+                },
+                element.transform
+            );
         case "ellipse":
+            return applyTransform(
+                {
+                    x: element.cx - element.rx,
+                    y: element.cy - element.ry,
+                    width: element.rx * 2,
+                    height: element.ry * 2,
+                },
+                element.transform
+            );
+        case "line": {
+            const x1 = (element.x1 + (element.transform?.x ?? 0)) * (element.transform?.scaleX ?? 1);
+            const x2 = (element.x2 + (element.transform?.x ?? 0)) * (element.transform?.scaleX ?? 1);
+            const y1 = (element.y1 + (element.transform?.y ?? 0)) * (element.transform?.scaleY ?? element.transform?.scaleX ?? 1);
+            const y2 = (element.y2 + (element.transform?.y ?? 0)) * (element.transform?.scaleY ?? element.transform?.scaleX ?? 1);
             return {
-                x: element.cx - element.rx,
-                y: element.cy - element.ry,
-                width: element.rx * 2,
-                height: element.ry * 2,
+                x: Math.min(x1, x2),
+                y: Math.min(y1, y2),
+                width: Math.abs(x2 - x1),
+                height: Math.abs(y2 - y1),
             };
-        case "line":
-            return {
-                x: Math.min(element.x1, element.x2),
-                y: Math.min(element.y1, element.y2),
-                width: Math.abs(element.x2 - element.x1),
-                height: Math.abs(element.y2 - element.y1),
-            };
+        }
         case "text":
-            return {
-                x: element.x,
-                y: element.y - (element.fontSize || 16),
-                width: Math.max((element.text?.length || 1) * (element.fontSize || 16) * 0.5, 10),
-                height: element.fontSize || 16,
-            };
+            return applyTransform(
+                {
+                    x: element.x,
+                    y: element.y - (element.fontSize || 16),
+                    width: Math.max((element.text?.length || 1) * (element.fontSize || 16) * 0.5, 10),
+                    height: element.fontSize || 16,
+                },
+                element.transform
+            );
         default:
             return null;
     }
