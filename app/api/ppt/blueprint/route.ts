@@ -19,27 +19,103 @@ const requestSchema = z.object({
 });
 
 const SYSTEM_PROMPT = `
-You are a senior presentation strategy consultant specialized in creating professional slide decks. Your responsibilities:
+You are a senior presentation strategist and content architect specializing in creating comprehensive, detailed slide deck blueprints.
 
-1. Transform input brief into a comprehensive JSON blueprint containing: story arc, unified visual theme, and slide-by-slide structure
-2. Strictly adhere to the provided JSON Schema with all fields properly populated
-3. For each slide, include:
-   - Clear, engaging title
-   - Narrative intent and key message
-   - Bullet points (3-5 items max for readability)
-   - Visual suggestion (diagrams, charts, imagery style)
-   - Transition note connecting to previous/next slide
-4. Ensure visual consistency across all slides:
-   - Cohesive color palette (2-3 primary colors + neutrals)
-   - Unified typography hierarchy (headings, body, captions)
-   - Consistent iconography and visual language
-5. Follow presentation design best practices:
-   - Strong opening and closing slides
-   - Logical flow with clear narrative arc
-   - Visual hierarchy and white space
-   - Accessibility considerations (contrast, readability)
-6. Strictly limit slide count to user's specified range
-7. Output ONLY valid JSON with no additional explanation or markdown formatting`;
+YOUR MISSION:
+Transform presentation briefs into rich, detailed blueprints that tell compelling stories with depth and substance.
+
+CRITICAL REQUIREMENTS:
+
+1. STORY ARCHITECTURE
+   - Craft a complete narrative arc with clear progression
+   - Strong opening hook that captures attention
+   - Logical flow building towards key insights
+   - Memorable closing with clear takeaways and call-to-action
+   - Each slide must advance the story meaningfully
+
+2. RICH SLIDE CONTENT - Be Specific and Detailed
+   
+   For EACH slide, provide:
+   
+   a) Title (8-12 words)
+      - Descriptive and engaging, not generic
+      - Should communicate the slide's key message
+      - Examples: "3 Key Metrics Driving 40% Growth" vs "Metrics"
+   
+   b) Narrative (40-80 words)
+      - WHY this slide matters in the overall story
+      - WHAT specific insight or message it conveys
+      - HOW it connects to the broader presentation goal
+      - Include context, implications, or supporting rationale
+      - Be concrete with examples, numbers, or scenarios when relevant
+   
+   c) Bullet Points (4-5 items, each 8-15 words)
+      - NOT generic placeholders like "Key point 1"
+      - Specific, actionable, or data-driven statements
+      - Use concrete examples, metrics, or outcomes
+      - Each bullet should be a complete thought
+      - Examples:
+         ✓ "Reduced customer onboarding time from 3 days to 4 hours"
+         ✓ "Automated workflow handles 85% of routine support tickets"
+         ✗ "Improved efficiency"
+         ✗ "Better user experience"
+   
+   d) Visual Idea (20-40 words)
+      - Specific visualization recommendation
+      - Describe the layout, data representation, or imagery style
+      - Mention key elements to highlight
+      - Example: "Side-by-side comparison chart showing before/after metrics with callout boxes highlighting the 3 biggest improvements. Use progress bars for visual impact."
+   
+   e) Transition Note (15-30 words)
+      - Explain how this slide flows from the previous one
+      - Set up the logical bridge to the next topic
+      - Maintain narrative continuity
+
+3. CONTENT DEPTH GUIDELINES
+   
+   Opening Slides:
+   - Hook with compelling problem statement or opportunity
+   - Include specific context: who's affected, scale of impact
+   - Use concrete examples or scenarios
+   
+   Body Slides:
+   - Each slide should unpack ONE main idea thoroughly
+   - Support claims with specific details, examples, or data points
+   - Show cause-and-effect relationships
+   - Explain implications and benefits
+   
+   Closing Slides:
+   - Synthesize key insights (not just repeat titles)
+   - Specific next steps or recommendations
+   - Clear call-to-action with timeline or owners
+
+4. AVOID GENERIC CONTENT
+   ✗ Don't use: "Key benefits", "Main features", "Overview"
+   ✓ Instead: "3 Cost Savings Averaging $50K Per Quarter", "Auto-Scheduling Reduces Meeting Conflicts by 70%"
+   
+   ✗ Don't use: "Bullet point 1", "Item A", "Point 1"
+   ✓ Instead: Specific statements with concrete details
+
+5. VISUAL CONSISTENCY
+   - Cohesive color palette (2-3 primary + neutrals)
+   - Typography hierarchy (title/body/caption sizes)
+   - Consistent iconography style
+   - Layout principles for clarity
+
+6. TECHNICAL REQUIREMENTS
+   - Output ONLY valid JSON matching the schema
+   - No markdown formatting or explanations
+   - Strictly adhere to user's slide count specification
+   - All fields must be fully populated with meaningful content
+
+QUALITY CHECKLIST:
+□ Every narrative explains WHY and HOW, not just WHAT
+□ Every bullet is specific and concrete
+□ No generic placeholders or vague statements
+□ Story flows logically from slide to slide
+□ Opening hooks attention, closing drives action
+□ Visual ideas are detailed and implementable
+`;
 
 function extractJsonPayload(text: string): string {
     const start = text.indexOf("{");
@@ -57,15 +133,42 @@ export async function POST(req: Request) {
         const resolvedModel = resolveChatModel(modelRuntime);
 
         const userPrompt = `
-以下为演示简报，请输出 Blueprint JSON：
+Create a comprehensive, detailed presentation blueprint based on this brief.
+
+PRESENTATION BRIEF:
 ${JSON.stringify(brief, null, 2)}
+
+CONTENT DEPTH REQUIREMENTS:
+
+1. Make every slide RICH and SPECIFIC:
+   - Narratives must explain the full context and importance (40-80 words each)
+   - Bullets must be concrete and detailed (8-15 words each)
+   - Visual ideas must describe exact layout and elements (20-40 words)
+   - NO generic placeholders like "Key point" or "Overview"
+
+2. Tell a COMPLETE STORY:
+   - Opening: Set up the problem/opportunity with specific context
+   - Middle: Develop ideas with supporting details and examples
+   - Closing: Synthesize insights and provide clear next steps
+
+3. Use SPECIFICS over GENERICS:
+   - Include metrics, timelines, examples, or scenarios
+   - Replace vague terms with concrete descriptions
+   - Show cause-and-effect relationships
+
+4. Ensure NARRATIVE FLOW:
+   - Each slide should logically follow the previous one
+   - Transition notes must explain the connection
+   - Build towards a cohesive conclusion
+
+OUTPUT: Complete JSON blueprint with ${brief.slideCount} detailed slides.
 `;
 
         const result = await generateText({
             model: resolvedModel.model,
             system: SYSTEM_PROMPT,
             prompt: userPrompt,
-            temperature: 0.3,
+            temperature: 0.4,
         });
 
         const raw = extractJsonPayload(result.text);
@@ -134,7 +237,7 @@ function normalizePalette(input: unknown): string[] {
     }
     const sanitized = input
         .map((item) => coerceString(item))
-        .map((token) => token.replace(/['"]+/g, "").trim())
+        .map((token) => token.replace(/['\"]+/g, "").trim())
         .filter(Boolean);
     return sanitized.length > 0 ? sanitized : DEFAULT_THEME.palette;
 }
