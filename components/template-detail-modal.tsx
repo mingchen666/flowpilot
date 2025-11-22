@@ -182,7 +182,7 @@ export function TemplateDetailModal({
           </div>
 
           {/* Right: Details */}
-          <div className="w-[380px] bg-white border-l flex flex-col">
+          <div className="w-[380px] bg-white border-l flex flex-col h-full overflow-hidden">
             {/* Info Section */}
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
               {/* Meta Info */}

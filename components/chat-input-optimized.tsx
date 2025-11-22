@@ -14,6 +14,7 @@ import {
     Settings,
     Palette,
     GitCompare,
+    Square,
 } from "lucide-react";
 import { ButtonWithTooltip } from "@/components/button-with-tooltip";
 import { FilePreviewList } from "@/components/file-preview-list";
@@ -47,6 +48,8 @@ interface ChatInputOptimizedProps {
     renderMode?: "drawio" | "svg";
     onRenderModeChange?: (mode: "drawio" | "svg") => void;
     comparisonEnabled?: boolean;
+    onStop?: () => void;
+    isBusy?: boolean;
 }
 
 export function ChatInputOptimized({
@@ -56,22 +59,24 @@ export function ChatInputOptimized({
     onChange,
     onClearChat,
     files = [],
-    onFileChange = () => {},
+    onFileChange = () => { },
     showHistory = false,
-    onToggleHistory = () => {},
+    onToggleHistory = () => { },
     isCompactMode = false,
     selectedModelKey,
     modelOptions = [],
-    onModelChange = () => {},
+    onModelChange = () => { },
     onManageModels,
-    onCompareRequest = () => {},
-    onOpenComparisonConfig = () => {},
+    onCompareRequest = () => { },
+    onOpenComparisonConfig = () => { },
     isCompareLoading = false,
     interactionLocked = false,
     onModelStreamingChange,
     renderMode = "drawio",
     onRenderModeChange,
     comparisonEnabled = true,
+    onStop,
+    isBusy = false,
 }: ChatInputOptimizedProps) {
     const { diagramHistory } = useDiagram();
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -218,7 +223,7 @@ export function ChatInputOptimized({
         >
             <div
                 className={cn(
-                    "relative overflow-hidden rounded-2xl border border-slate-200 bg-white/90 shadow-md transition-all",
+                    "relative overflow-hidden rounded-3xl border border-slate-200 bg-white/90 shadow-sm transition-all",
                     isDragging && "ring-2 ring-slate-300"
                 )}
             >
@@ -258,7 +263,7 @@ export function ChatInputOptimized({
                     />
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 px-3 pt-1 pb-1.5">
+                <div className="flex flex-nowrap items-center justify-between gap-2 px-3 pt-1 pb-1.5 overflow-x-auto scrollbar-hide">
                     <div className="flex items-center gap-1.5">
                         <ButtonWithTooltip
                             type="button"
@@ -287,21 +292,9 @@ export function ChatInputOptimized({
                         >
                             <History className="h-4 w-4" />
                         </ButtonWithTooltip>
-
-                        <ButtonWithTooltip
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 rounded-full"
-                            onClick={triggerFileInput}
-                            disabled={status === "streaming" || interactionLocked}
-                            tooltipContent="上传图片"
-                        >
-                            <ImageIcon className="h-4 w-4" />
-                        </ButtonWithTooltip>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-nowrap items-center gap-2">
                         <Button
                             type="button"
                             variant={renderMode === "svg" ? "secondary" : "outline"}
@@ -328,45 +321,84 @@ export function ChatInputOptimized({
                         />
                         {comparisonEnabled ? (
                             <div className="flex items-center gap-2">
-                                <div className="flex items-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
-
+                                {isBusy ? (
                                     <Button
                                         type="button"
-                                        variant="secondary"
+                                        onClick={onStop}
+                                        className="h-8 min-w-[30px] gap-2 rounded-full bg-red-500 text-white shadow-sm transition hover:bg-red-600"
                                         size="sm"
-                                        className="h-8 gap-1 rounded-none border-0 bg-slate-900/10 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-900/20 disabled:opacity-60"
-                                        disabled={
-                                            status === "streaming" ||
-                                            (!input.trim() && !isCompareLoading) ||
-                                            interactionLocked
-                                        }
-                                        onClick={onCompareRequest}
-                                        aria-label="使用当前提示词进行多模型对比"
+                                        aria-label="暂停生成"
                                     >
-                                        {isCompareLoading ? (
-                                            <>
-                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                对比中…
-                                            </>
-                                        ) : (
-                                            <>
-                                                <GitCompare className="h-3.5 w-3.5" />
-                                                对比生成
-                                            </>
-                                        )}
+                                        <Square className="h-3.5 w-3.5 fill-current" />
                                     </Button>
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 rounded-none border-r border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-                                        onClick={onOpenComparisonConfig}
-                                        disabled={status === "streaming" || interactionLocked}
-                                        aria-label="对比设置"
-                                    >
-                                        <Settings className="h-4 w-4" />
-                                    </Button>
-                                </div>
+                                ) : (
+                                    <>
+                                        <div className="flex items-center overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
+
+                                            <Button
+                                                type="button"
+                                                variant="secondary"
+                                                size="sm"
+                                                className="h-8 gap-1 rounded-none border-0 bg-slate-900/10 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-900/20 disabled:opacity-60"
+                                                disabled={
+                                                    status === "streaming" ||
+                                                    (!input.trim() && !isCompareLoading) ||
+                                                    interactionLocked
+                                                }
+                                                onClick={onCompareRequest}
+                                                aria-label="使用当前提示词进行多模型对比"
+                                            >
+                                                {isCompareLoading ? (
+                                                    <>
+                                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                        生成中…
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        对比
+                                                    </>
+                                                )}
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 rounded-none border-r border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                                                onClick={onOpenComparisonConfig}
+                                                disabled={status === "streaming" || interactionLocked}
+                                                aria-label="对比设置"
+                                            >
+                                                <Settings className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                        <Button
+                                            type="submit"
+                                            disabled={
+                                                status === "streaming" ||
+                                                !input.trim() ||
+                                                interactionLocked
+                                            }
+                                            className="h-8 min-w-[30px] gap-2 rounded-full bg-slate-900 text-white shadow-sm transition hover:bg-slate-900/90 disabled:opacity-60"
+                                            size="sm"
+                                            aria-label="发送消息"
+                                        >
+                                            <Send className="h-4 w-4" />
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                        ) : (
+                            isBusy ? (
+                                <Button
+                                    type="button"
+                                    onClick={onStop}
+                                    className="h-8 min-w-[30px] gap-2 rounded-full bg-red-500 text-white shadow-sm transition hover:bg-red-600"
+                                    size="sm"
+                                    aria-label="暂停生成"
+                                >
+                                    <Square className="h-3.5 w-3.5 fill-current" />
+                                </Button>
+                            ) : (
                                 <Button
                                     type="submit"
                                     disabled={
@@ -376,43 +408,12 @@ export function ChatInputOptimized({
                                     }
                                     className="h-8 min-w-[88px] gap-2 rounded-full bg-slate-900 text-white shadow-sm transition hover:bg-slate-900/90 disabled:opacity-60"
                                     size="sm"
-                                    aria-label={
-                                        status === "streaming"
-                                            ? "正在发送消息…"
-                                            : "发送消息"
-                                    }
+                                    aria-label="发送消息"
                                 >
-                                    {status === "streaming" ? (
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                        <Send className="h-4 w-4" />
-                                    )}
+                                    <Send className="h-4 w-4" />
                                     发送
                                 </Button>
-                            </div>
-                        ) : (
-                            <Button
-                                type="submit"
-                                disabled={
-                                    status === "streaming" ||
-                                    !input.trim() ||
-                                    interactionLocked
-                                }
-                                className="h-8 min-w-[88px] gap-2 rounded-full bg-slate-900 text-white shadow-sm transition hover:bg-slate-900/90 disabled:opacity-60"
-                                size="sm"
-                                aria-label={
-                                    status === "streaming"
-                                        ? "正在发送消息…"
-                                        : "发送消息"
-                                }
-                            >
-                                {status === "streaming" ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                    <Send className="h-4 w-4" />
-                                )}
-                                发送
-                            </Button>
+                            )
                         )}
                     </div>
                 </div>

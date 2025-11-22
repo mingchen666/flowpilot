@@ -19,6 +19,7 @@ import type {
 interface TemplateGalleryProps {
   onSelectTemplate: (template: DiagramTemplate) => void;
   variant?: "default" | "compact";
+  onExpand?: () => void;
 }
 
 // Category metadata
@@ -36,6 +37,7 @@ const RECENT_KEY = "flowpilot_recent_templates";
 export function TemplateGallery({
   onSelectTemplate,
   variant = "default",
+  onExpand,
 }: TemplateGalleryProps) {
   const [selectedCategory, setSelectedCategory] = useState<TemplateCategory>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -370,11 +372,10 @@ export function TemplateGallery({
       {/* Main area */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Header */}
-        <div className={cn("border-b bg-gradient-to-r from-slate-50 to-white px-4 py-4", isCompact && "px-3 py-3")}>
+        <div className={cn("border-b bg-gradient-to-r from-slate-50 to-white px-4 py-4", isCompact && "border-none bg-transparent px-0 py-0 pb-3")}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className={cn("text-xl font-semibold text-slate-900", isCompact && "text-base")}>
-                <span className="mr-2">📚</span>
+              <h2 className={cn("text-xl font-semibold text-slate-900", isCompact && "hidden")}>
                 模板库
               </h2>
               {!isCompact && (
@@ -409,7 +410,7 @@ export function TemplateGallery({
 
           {/* Search + sort */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="relative w-full sm:max-w-md">
+            <div className="relative w-full flex-1 sm:max-w-md">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 type="text"
@@ -429,6 +430,18 @@ export function TemplateGallery({
                 </button>
               )}
             </div>
+            {isCompact && onExpand && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onExpand}
+                className="shrink-0 text-slate-500 hover:text-slate-700 gap-1 px-2"
+                title="全屏查看"
+              >
+                <span className="text-lg">⛶</span>
+                <span className="text-xs">全屏库</span>
+              </Button>
+            )}
             {!isCompact && (
               <div className="flex items-center gap-2 text-sm text-slate-600">
                 <span className="hidden text-xs text-slate-500 sm:inline">排序</span>
@@ -457,7 +470,7 @@ export function TemplateGallery({
               <div
                 className={cn(
                   "grid gap-4",
-                  viewMode === "grid" ? (isCompact ? "grid-cols-1" : "sm:grid-cols-2 xl:grid-cols-3") : "grid-cols-1"
+                  viewMode === "grid" ? (isCompact ? "grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-3") : "grid-cols-1"
                 )}
               >
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -467,7 +480,7 @@ export function TemplateGallery({
             ) : filteredTemplates.length > 0 ? (
               <>
                 {viewMode === "grid" ? (
-                  <div className={cn("grid gap-4", isCompact ? "grid-cols-1" : "sm:grid-cols-2 xl:grid-cols-3")}>
+                  <div className={cn("grid gap-4", isCompact ? "grid-cols-2" : "sm:grid-cols-2 xl:grid-cols-3")}>
                     {filteredTemplates.slice(0, visibleCount).map((template, index) => (
                       <div
                         key={template.id}
@@ -482,6 +495,7 @@ export function TemplateGallery({
                           onUse={handleUseTemplate}
                           onHover={(t) => setSelectedTemplateId(t.id)}
                           onClick={handleOpenDetail}
+                          compact={isCompact}
                         />
                       </div>
                     ))}

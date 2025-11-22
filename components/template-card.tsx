@@ -79,6 +79,7 @@ interface TemplateCardProps {
   variant?: "grid" | "list";
   onHover?: (template: DiagramTemplate) => void;
   onClick?: (template: DiagramTemplate) => void;
+  compact?: boolean;
 }
 
 export function TemplateCard({
@@ -87,6 +88,7 @@ export function TemplateCard({
   variant = "grid",
   onHover,
   onClick,
+  compact = false,
 }: TemplateCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -190,6 +192,80 @@ export function TemplateCard({
     );
   }
 
+  // Compact Mode (Sample Room Style)
+  if (compact) {
+    return (
+      <div
+        className={cn(
+          "group flex h-full flex-col rounded-2xl border border-slate-200 bg-white/80 p-3 text-left shadow-sm transition hover:border-slate-900 hover:shadow-md cursor-pointer",
+        )}
+        onClick={() => onClick?.(template)}
+        onMouseEnter={() => {
+          setIsHovered(true);
+          onHover?.(template);
+        }}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <div className="relative overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
+          <div
+            className="aspect-[16/9] w-full relative"
+            style={{
+              background: `linear-gradient(135deg, ${template.gradient.from} 0%, ${template.gradient.to} 100%)`,
+            }}
+          >
+            {template.previewUrl && (
+              <div
+                className="absolute inset-0 bg-cover bg-center opacity-90"
+                style={{ backgroundImage: `url(${template.previewUrl})` }}
+              />
+            )}
+
+            <div className="absolute inset-0 flex flex-col justify-between p-3 text-white">
+              <div className="flex justify-between items-start">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-white/80 bg-black/20 px-1.5 py-0.5 rounded backdrop-blur-sm">
+                  {template.estimatedTime}
+                </div>
+                {template.isPopular && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 drop-shadow-sm" />}
+              </div>
+              <Icon className="h-6 w-6 text-white drop-shadow-sm opacity-80" />
+            </div>
+            <div className="pointer-events-none absolute -right-6 -top-6 h-16 w-16 rounded-full bg-white/20 blur-xl" />
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-col gap-1">
+          <p className="text-sm font-semibold text-slate-900 line-clamp-1">
+            {template.title}
+          </p>
+          <p className="text-xs text-slate-600 line-clamp-2">
+            {template.description}
+          </p>
+        </div>
+
+        <div className="mt-2 flex flex-wrap gap-1">
+          {template.tags.slice(0, 2).map((tag) => (
+            <span
+              key={tag}
+              className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onUse(template);
+          }}
+          className="mt-3 inline-flex w-fit items-center gap-1 rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-[11px] font-semibold text-slate-600 transition group-hover:border-slate-900 group-hover:text-slate-900 hover:bg-slate-50"
+        >
+          一键套用
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       className={cn(
@@ -208,7 +284,10 @@ export function TemplateCard({
       <div className="absolute right-3 top-3 z-10 flex gap-1">{badges}</div>
 
       {/* Gradient Header / Preview */}
-      <div className="flex h-[120px] items-center justify-center rounded-t-xl">
+      <div className={cn(
+        "flex items-center justify-center rounded-t-xl",
+        "h-[120px]"
+      )}>
         {previewBlock}
       </div>
 
@@ -220,9 +299,11 @@ export function TemplateCard({
         </h3>
 
         {/* Description */}
+
         <p className="mb-3 line-clamp-2 text-sm text-slate-600">
           {template.description}
         </p>
+
 
         {/* Metadata */}
         <div className="mb-3 flex items-center gap-3 text-xs text-slate-500">
@@ -272,7 +353,7 @@ export function TemplateCard({
             →
           </span>
         </Button>
-        
+
         {/* Click to view hint */}
         {isHovered && (
           <div className="absolute inset-0 bg-black/5 rounded-xl flex items-center justify-center backdrop-blur-[0.5px] pointer-events-none">

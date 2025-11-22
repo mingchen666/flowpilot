@@ -182,7 +182,7 @@ export function ModelSelector({
                 disabled={disabled}
                 ref={triggerRef}
                 className={cn(
-                    "h-8 min-w-[130px] justify-between rounded-full border-slate-200 px-3 text-xs font-medium text-slate-700 hover:border-slate-300",
+                    "h-8 min-w-[120px] justify-between rounded-full border-slate-200 px-3 text-xs font-medium text-slate-700 hover:border-slate-300",
                     !selectedModel && "text-slate-400"
                 )}
             >

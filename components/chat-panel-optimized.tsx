@@ -13,6 +13,7 @@ import {
     PauseCircle,
     Sparkles,
 } from "lucide-react";
+import { LanguageSwitcher } from "@/components/language-switcher";
 
 import {
     Card,
@@ -71,7 +72,7 @@ import { serializeAttachments } from "@/features/chat-panel/utils/attachments";
 import { useModelRegistry } from "@/hooks/use-model-registry";
 import { ModelConfigDialog } from "@/components/model-config-dialog";
 import type { RuntimeModelConfig } from "@/types/model-config";
-import {TemplateGallery} from "@/components/template-gallery";
+import { TemplateGallery } from "@/components/template-gallery";
 
 interface ChatPanelProps {
     onCollapse?: () => void;
@@ -1027,21 +1028,8 @@ export default function ChatPanelOptimized({
                     </div>
                 </div>
                 {commandTab === "templates" ? (
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between px-1">
-                            <div className="text-sm font-semibold text-slate-700">
-                                模板库 · 精选
-                            </div>
-                            <Button
-                                size="sm"
-                                variant="secondary"
-                                className="rounded-full"
-                                onClick={() => setIsTemplateDialogOpen(true)}
-                            >
-                                全屏模板库
-                            </Button>
-                        </div>
-                        <div className="h-[64vh] overflow-hidden rounded-lg border bg-white">
+                    <div className="flex h-full flex-col">
+                        <div className="flex-1 overflow-hidden">
                             <TemplateGallery
                                 variant="compact"
                                 onSelectTemplate={(template) => {
@@ -1055,6 +1043,7 @@ export default function ChatPanelOptimized({
                                     }
                                     closeToolSidebar();
                                 }}
+                                onExpand={() => setIsTemplateDialogOpen(true)}
                             />
                         </div>
                     </div>
@@ -1096,12 +1085,24 @@ export default function ChatPanelOptimized({
                 <CardHeader className="flex shrink-0 flex-col gap-2 border-b border-slate-100 px-3 py-2">
                     <div className="flex w-full items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                            <CardTitle className="text-base font-semibold tracking-tight text-slate-900">
-                                FlowPilot 智能流程图
-                            </CardTitle>
-                            <span className="text-[11px] uppercase tracking-wide text-slate-400">
-                                studio
-                            </span>
+                            <div className="flex items-center gap-1 rounded-full bg-slate-100 p-0.5">
+                                <a
+                                    href="/"
+                                    className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-900 shadow-sm"
+                                >
+                                    画图工作室
+                                </a>
+                                <a
+                                    href="/ppt"
+                                    className="flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-slate-500 hover:text-slate-900"
+                                >
+                                    PPT 工作室
+                                    <span className="rounded bg-amber-100 px-1 py-0.5 text-[9px] font-bold text-amber-600">
+                                        实验功能
+                                    </span>
+                                </a>
+                            </div>
+                            <LanguageSwitcher />
                         </div>
                         <div className="flex items-center gap-1.5">
                             {isConversationStarted && (
@@ -1151,50 +1152,7 @@ export default function ChatPanelOptimized({
                             )}
                         </div>
                     </div>
-                    {showSessionStatus && (
-                        <div className="flex flex-col gap-2">
-                            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                                <SessionStatus
-                                    className="flex-1"
-                                    variant="inline"
-                                    status={status}
-                                    providerLabel={
-                                        selectedModel?.label ||
-                                        selectedModel?.modelId ||
-                                        "未配置模型"
-                                    }
-                                    diagramVersions={
-                                        diagramHistory.length > 0
-                                            ? diagramHistory.length
-                                            : chartXML
-                                                ? 1
-                                                : 0
-                                    }
-                                    attachmentCount={files.length}
-                                    exchanges={exchanges}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        handleStopAll({
-                                            type: "success",
-                                            message: "已手动暂停当前生成任务。",
-                                        })
-                                    }
-                                    disabled={!isGenerationBusy}
-                                    className={cn(
-                                        "inline-flex items-center justify-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition",
-                                        isGenerationBusy
-                                            ? "border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white"
-                                            : "cursor-not-allowed border-slate-200 text-slate-300"
-                                    )}
-                                >
-                                    <PauseCircle className="h-3.5 w-3.5" />
-                                    {isGenerationBusy ? "暂停生成" : "已暂停"}
-                                </button>
-                            </div>
-                        </div>
-                    )}
+
                 </CardHeader>
                 <CardContent className="flex flex-1 min-h-0 flex-col px-3 pb-3 pt-2 overflow-hidden">
                     <div className="flex flex-1 min-h-0 flex-col gap-3 overflow-hidden">
@@ -1239,7 +1197,7 @@ export default function ChatPanelOptimized({
                                 </div>
                             )}
                             <div
-                                className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden rounded-xl bg-white/90 px-2 py-2"
+                                className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden rounded-xl bg-white/90 px-2 py-2 pb-40"
                                 style={{ maxHeight: '100%' }}
                             >
                                 <ChatMessageDisplay
@@ -1298,16 +1256,16 @@ export default function ChatPanelOptimized({
                     </div>
                 </CardContent>
 
-                <CardFooter className="shrink-0 border-t border-slate-100 bg-background p-3">
+                <div className="absolute bottom-6 left-1/2 w-full max-w-[90%] -translate-x-1/2 z-10">
                     <div className="flex w-full flex-col gap-2">
                         {briefDisplayBadges.length > 0 && (
-                            <div className="flex items-center gap-2 rounded-2xl border border-slate-100 bg-white/90 px-3 py-2 text-[11px] text-slate-500 shadow-sm">
+                            <div className="mx-auto flex w-fit items-center gap-2 rounded-full border border-slate-200/60 bg-white/80 px-3 py-1.5 text-[11px] text-slate-500 shadow-lg backdrop-blur-md transition-all hover:bg-white/90">
                                 <span className="inline-flex items-center gap-1 rounded-full bg-slate-900/5 px-2 py-0.5 font-semibold uppercase tracking-[0.25em] text-slate-600">
                                     <Sparkles className="h-3 w-3 text-amber-500" />
                                     Brief
                                 </span>
                                 <div
-                                    className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden whitespace-nowrap pr-1"
+                                    className="flex min-w-0 max-w-[300px] items-center gap-1 overflow-hidden whitespace-nowrap pr-1"
                                     title={briefDisplayBadges.join(" · ")}
                                 >
                                     {briefDisplayBadges.map((badge, index) => (
@@ -1336,84 +1294,93 @@ export default function ChatPanelOptimized({
                                 </button>
                             </div>
                         )}
-                        <ChatInputOptimized
-                            input={input}
-                            status={status}
-                            onSubmit={onFormSubmit}
-                            onChange={handleInputChange}
-                            onClearChat={handleClearChat}
-                            files={files}
-                            onFileChange={handleFileChange}
-                            showHistory={showHistory}
-                            onToggleHistory={setShowHistory}
-                            isCompactMode={isCompactMode && isConversationStarted}
-                            selectedModelKey={selectedModelKey}
-                            modelOptions={modelOptions}
-                            onModelChange={selectModel}
-                            onManageModels={() => setIsModelConfigOpen(true)}
-                            onModelStreamingChange={handleModelStreamingChange}
-                            comparisonEnabled={isComparisonAllowed}
-                            onCompareRequest={async () => {
-                                if (!isComparisonAllowed) {
-                                    return;
-                                }
-                                if (!input.trim()) {
-                                    return;
-                                }
+                        <div className="shadow-2xl rounded-3xl">
+                            <ChatInputOptimized
+                                input={input}
+                                status={status}
+                                onSubmit={onFormSubmit}
+                                onChange={handleInputChange}
+                                onClearChat={handleClearChat}
+                                files={files}
+                                onFileChange={handleFileChange}
+                                showHistory={showHistory}
+                                onToggleHistory={setShowHistory}
+                                isCompactMode={isCompactMode && isConversationStarted}
+                                selectedModelKey={selectedModelKey}
+                                modelOptions={modelOptions}
+                                onModelChange={selectModel}
+                                onManageModels={() => setIsModelConfigOpen(true)}
+                                onModelStreamingChange={handleModelStreamingChange}
+                                comparisonEnabled={isComparisonAllowed}
+                                onCompareRequest={async () => {
+                                    if (!isComparisonAllowed) {
+                                        return;
+                                    }
+                                    if (!input.trim()) {
+                                        return;
+                                    }
 
-                                // 先添加用户消息
-                                const enrichedInput =
-                                    briefContext.prompt.length > 0
-                                        ? `${briefContext.prompt}\n\n${input}`
-                                        : input;
+                                    // 先添加用户消息
+                                    const enrichedInput =
+                                        briefContext.prompt.length > 0
+                                            ? `${briefContext.prompt}\n\n${input}`
+                                            : input;
 
-                                const parts: Array<
-                                    | { type: "text"; text: string; displayText?: string }
-                                    | { type: "file"; url: string; mediaType: string }
-                                > = [{ type: "text", text: enrichedInput, displayText: input }];
+                                    const parts: Array<
+                                        | { type: "text"; text: string; displayText?: string }
+                                        | { type: "file"; url: string; mediaType: string }
+                                    > = [{ type: "text", text: enrichedInput, displayText: input }];
 
-                                if (files.length > 0) {
-                                    const attachments = await serializeAttachments(files);
-                                    attachments.forEach(({ url, mediaType }) => {
-                                        parts.push({
-                                            type: "file",
-                                            url,
-                                            mediaType,
+                                    if (files.length > 0) {
+                                        const attachments = await serializeAttachments(files);
+                                        attachments.forEach(({ url, mediaType }) => {
+                                            parts.push({
+                                                type: "file",
+                                                url,
+                                                mediaType,
+                                            });
                                         });
-                                    });
+                                    }
+
+                                    // 生成用户消息 ID
+                                    const userMessageId = `user-compare-${Date.now()}`;
+
+                                    // 手动添加用户消息到 messages（这样消息会显示在对话中）
+                                    setMessages((prev) => [
+                                        ...prev,
+                                        {
+                                            id: userMessageId,
+                                            role: "user",
+                                            parts,
+                                        } as any,
+                                    ]);
+
+                                    // 然后发起对比请求，传入用户消息 ID 作为 anchor
+                                    void handleCompareRequest(userMessageId);
+                                    setInput("");
+                                    setFiles([]);
+                                }}
+                                onOpenComparisonConfig={() => {
+                                    if (!isComparisonAllowed) return;
+                                    setIsComparisonConfigOpen(true);
+                                }}
+                                isCompareLoading={isComparisonRunning}
+                                interactionLocked={requiresBranchDecision || !selectedModel}
+                                renderMode={renderMode}
+                                onRenderModeChange={setRenderMode}
+                                onStop={() =>
+                                    handleStopAll({
+                                        type: "success",
+                                        message: "已手动暂停当前生成任务。",
+                                    })
                                 }
-
-                                // 生成用户消息 ID
-                                const userMessageId = `user-compare-${Date.now()}`;
-
-                                // 手动添加用户消息到 messages（这样消息会显示在对话中）
-                                setMessages((prev) => [
-                                    ...prev,
-                                    {
-                                        id: userMessageId,
-                                        role: "user",
-                                        parts,
-                                    } as any,
-                                ]);
-
-                                // 然后发起对比请求，传入用户消息 ID 作为 anchor
-                                void handleCompareRequest(userMessageId);
-                                setInput("");
-                                setFiles([]);
-                            }}
-                            onOpenComparisonConfig={() => {
-                                if (!isComparisonAllowed) return;
-                                setIsComparisonConfigOpen(true);
-                            }}
-                            isCompareLoading={isComparisonRunning}
-                            interactionLocked={requiresBranchDecision || !selectedModel}
-                            renderMode={renderMode}
-                            onRenderModeChange={setRenderMode}
-                        />
+                                isBusy={isGenerationBusy}
+                            />
+                        </div>
                     </div>
-                </CardFooter>
+                </div>
 
-            </Card>
+            </Card >
             <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
                 <DialogContent className="!max-w-[95vw] w-[95vw] h-[90vh] p-0 overflow-hidden">
                     <DialogHeader className="px-6 pt-4 pb-2">

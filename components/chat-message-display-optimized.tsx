@@ -262,15 +262,9 @@ const DiagramToolCard = memo(({
             className="my-2 w-full max-w-[min(720px,90%)] rounded-lg bg-white/80 border border-slate-200/60 px-4 py-3 text-xs text-slate-600"
         >
             <div className="flex items-center justify-between gap-2">
-                <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                        智能图表结果
-                    </div>
-                    <div className="text-[10px] text-slate-400">
-                        工具：{toolName}
-                    </div>
-                    <div className="text-[10px] text-slate-400">
-                        输出：{diagramMode === "svg" ? "SVG 嵌入" : "draw.io XML"}
+                        {toolName === "display_diagram" || toolName === "display_svg" ? "图表生成完成" : "工具执行完成"}
                     </div>
                 </div>
                 <span className={statusClass}>{statusLabel}</span>
@@ -279,26 +273,33 @@ const DiagramToolCard = memo(({
                 {statusMessage}
             </div>
             {diagramMode === "svg" && currentState === "output-available" && displaySvg && (
-                <div className="mt-3 rounded-lg border border-slate-100 bg-white/90 p-2">
-                    <div className="text-[11px] font-semibold text-slate-500 mb-1">
-                        SVG 预览
-                    </div>
-                    <div className="relative h-48 w-full overflow-hidden rounded-lg bg-slate-50">
-                        {svgToDataUrl(displaySvg) ? (
-                            <Image
-                                src={svgToDataUrl(displaySvg)!}
-                                alt={`svg-preview-${callId}`}
-                                fill
-                                className="object-contain"
-                                sizes="(max-width: 768px) 100vw, 320px"
-                                unoptimized
-                            />
-                        ) : (
-                            <div className="flex h-full w-full items-center justify-center text-[11px] text-slate-400">
-                                预览转换失败
+                <div className="mt-2">
+                    <details className="group">
+                        <summary className="flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-slate-500 hover:text-slate-700">
+                            <svg className="h-3.5 w-3.5 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            查看 SVG 预览
+                        </summary>
+                        <div className="mt-2 rounded-lg border border-slate-100 bg-white/90 p-2">
+                            <div className="relative h-48 w-full overflow-hidden rounded-lg bg-slate-50">
+                                {svgToDataUrl(displaySvg) ? (
+                                    <Image
+                                        src={svgToDataUrl(displaySvg)!}
+                                        alt={`svg-preview-${callId}`}
+                                        fill
+                                        className="object-contain"
+                                        sizes="(max-width: 768px) 100vw, 320px"
+                                        unoptimized
+                                    />
+                                ) : (
+                                    <div className="flex h-full w-full items-center justify-center text-[11px] text-slate-400">
+                                        预览转换失败
+                                    </div>
+                                )}
                             </div>
-                        )}
-                    </div>
+                        </div>
+                    </details>
                 </div>
             )}
             {/* 超时提示 */}
@@ -371,8 +372,8 @@ const DiagramToolCard = memo(({
                     </button>
                 )}
             </div>
-            {/* Token 使用信息显示 - 仅在完成时显示 */}
-            {currentState === "output-available" && messageMetadata && (
+            {/* Token 使用信息显示 - 仅在完成时显示 (已隐藏以节省空间) */}
+            {/* {currentState === "output-available" && messageMetadata && (
                 <div className="mt-3">
                     <TokenUsageDisplay
                         usage={messageMetadata.usage}
@@ -380,7 +381,7 @@ const DiagramToolCard = memo(({
                         compact
                     />
                 </div>
-            )}
+            )} */}
         </div>
     );
 });
@@ -977,20 +978,20 @@ export function ChatMessageDisplay({
                                                         >
                                                             预览
                                                         </Button>
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        className="h-8 rounded-md bg-blue-500 px-3 text-xs font-medium text-white hover:bg-blue-600"
-                                                        onClick={(event) => {
-                                                            event.stopPropagation();
-                                                            onComparisonApply?.(result);
-                                                        }}
-                                                        disabled={!result.xml && !result.svg}
-                                                    >
-                                                        设为画布
-                                                    </Button>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            className="h-8 rounded-md bg-blue-500 px-3 text-xs font-medium text-white hover:bg-blue-600"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                onComparisonApply?.(result);
+                                                            }}
+                                                            disabled={!result.xml && !result.svg}
+                                                        >
+                                                            设为画布
+                                                        </Button>
+                                                    </div>
                                                 </div>
-                                            </div>
                                             )}
                                         </div>
 
@@ -1017,19 +1018,19 @@ export function ChatMessageDisplay({
                                                         >
                                                             预览
                                                         </Button>
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        className="h-6 rounded-md bg-blue-500 px-2 text-[11px] text-white hover:bg-blue-600"
-                                                        onClick={(event) => {
-                                                            event.stopPropagation();
-                                                            onComparisonApply?.(result);
-                                                        }}
-                                                        disabled={!result.xml && !result.svg}
-                                                    >
-                                                        设为画布
-                                                    </Button>
-                                                </div>
+                                                        <Button
+                                                            type="button"
+                                                            size="sm"
+                                                            className="h-6 rounded-md bg-blue-500 px-2 text-[11px] text-white hover:bg-blue-600"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                onComparisonApply?.(result);
+                                                            }}
+                                                            disabled={!result.xml && !result.svg}
+                                                        >
+                                                            设为画布
+                                                        </Button>
+                                                    </div>
                                                 )}
                                             </div>
                                             {/* Token 使用信息 */}

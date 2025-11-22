@@ -104,7 +104,7 @@ export default function Home() {
     return (
         <div className="bg-gray-100">
             <section className="flex min-h-screen flex-col">
-                <WorkspaceNav />
+                {/* <WorkspaceNav /> */}
                 <div
                     ref={mainContentRef}
                     className={cn(
