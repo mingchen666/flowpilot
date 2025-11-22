@@ -16,6 +16,10 @@ export default function Home() {
     const [drawioError, setDrawioError] = useState<string | null>(null);
     const [isDrawioLoading, setIsDrawioLoading] = useState(true);
     const [isChatVisible, setIsChatVisible] = useState(true);
+    const [chatWidthPercent, setChatWidthPercent] = useState(34);
+    const [isResizingChat, setIsResizingChat] = useState(false);
+    const resizeRafRef = React.useRef<number | null>(null);
+    const pendingChatPercentRef = React.useRef(chatWidthPercent);
 
     // 可配置的 DrawIO baseUrl，支持环境变量或使用默认值
     // 如果 embed.diagrams.net 无法访问，可以尝试：
@@ -88,10 +92,6 @@ export default function Home() {
         );
     }
 
-    const desktopGridCols = isChatVisible
-        ? "lg:grid-cols-[minmax(0,68%)_minmax(360px,1fr)]"
-        : "lg:grid-cols-[minmax(0,1fr)_0px]";
-
     const mainContentRef = React.useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -101,6 +101,88 @@ export default function Home() {
         }
     }, []);
 
+    useEffect(() => {
+        if (!isResizingChat) return;
+
+        const handleMove = (event: PointerEvent) => {
+            if (!mainContentRef.current || !isChatVisible) return;
+            const rect = mainContentRef.current.getBoundingClientRect();
+            const offsetX = event.clientX - rect.left;
+            const minChatPx = 320;
+            const minCanvasPx = 520;
+            const clampedX = Math.min(
+                Math.max(offsetX, minCanvasPx),
+                rect.width - minChatPx
+            );
+            const nextChatPercent = ((rect.width - clampedX) / rect.width) * 100;
+            const clampedPercent = Math.min(
+                50,
+                Math.max(26, nextChatPercent)
+            );
+            if (Math.abs(clampedPercent - pendingChatPercentRef.current) < 0.25) {
+                return;
+            }
+            pendingChatPercentRef.current = clampedPercent;
+            if (resizeRafRef.current === null) {
+                resizeRafRef.current = window.requestAnimationFrame(() => {
+                    setChatWidthPercent(pendingChatPercentRef.current);
+                    resizeRafRef.current = null;
+                });
+            }
+        };
+
+        const handleUp = () => {
+            setIsResizingChat(false);
+            document.body.classList.remove("select-none");
+        };
+
+        window.addEventListener("pointermove", handleMove, { passive: true });
+        window.addEventListener("pointerup", handleUp, { passive: true });
+        window.addEventListener("pointercancel", handleUp, { passive: true });
+        window.addEventListener("blur", handleUp);
+        window.addEventListener("mouseleave", handleUp);
+
+        return () => {
+            window.removeEventListener("pointermove", handleMove);
+            window.removeEventListener("pointerup", handleUp);
+            window.removeEventListener("pointercancel", handleUp);
+            window.removeEventListener("blur", handleUp);
+            window.removeEventListener("mouseleave", handleUp);
+        };
+    }, [isResizingChat, isChatVisible]);
+
+    useEffect(() => {
+        if (!isChatVisible) {
+            setIsResizingChat(false);
+            document.body.classList.remove("select-none");
+        }
+    }, [isChatVisible]);
+
+    useEffect(() => {
+        pendingChatPercentRef.current = chatWidthPercent;
+    }, [chatWidthPercent]);
+
+    useEffect(() => {
+        return () => {
+            if (resizeRafRef.current !== null) {
+                cancelAnimationFrame(resizeRafRef.current);
+            }
+        };
+    }, []);
+
+    const handleResizeChatStart = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (!isChatVisible || event.button !== 0) return;
+        event.preventDefault();
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        document.body.classList.add("select-none");
+        setIsResizingChat(true);
+    };
+
+    const RESIZER_WIDTH = 10;
+    const gridTemplateColumns = isChatVisible
+        ? `minmax(520px, ${Math.max(20, 100 - chatWidthPercent)}fr) ${RESIZER_WIDTH}px minmax(320px, ${chatWidthPercent}fr)`
+        : "1fr";
+
     return (
         <div className="bg-gray-100">
             <section className="flex min-h-screen flex-col">
@@ -108,9 +190,9 @@ export default function Home() {
                 <div
                     ref={mainContentRef}
                     className={cn(
-                        "flex-1 min-h-0 lg:grid h-dvh",
-                        desktopGridCols
+                        "grid h-dvh min-h-0 flex-1"
                     )}
+                    style={{ gridTemplateColumns }}
                 >
                     <div className="relative flex h-full min-h-0 p-1">
                         <div
@@ -190,19 +272,35 @@ export default function Home() {
                             </>
                         )}
                     </div>
-                    <div
-                        className={cn(
-                            "hidden h-full min-h-0 p-1 transition-all duration-300 lg:block",
-                            isChatVisible
-                                ? "opacity-100"
-                                : "pointer-events-none opacity-0 translate-x-4"
-                        )}
-                    >
-                        <ChatPanelOptimized
-                            onCollapse={() => setIsChatVisible(false)}
-                            isCollapsible
-                        />
-                    </div>
+                    {isChatVisible && (
+                        <div
+                            role="separator"
+                            aria-orientation="vertical"
+                            onPointerDown={handleResizeChatStart}
+                            className={cn(
+                                "hidden h-full items-center justify-center border-x border-slate-100 bg-white/60 transition hover:bg-slate-100 active:bg-slate-200 lg:flex cursor-col-resize",
+                                isResizingChat && "bg-blue-50 border-blue-200"
+                            )}
+                            style={{ width: RESIZER_WIDTH }}
+                        >
+                            <div className="h-10 w-1 rounded-full bg-slate-300" />
+                        </div>
+                    )}
+                    {isChatVisible && (
+                        <div
+                            className={cn(
+                                "hidden h-full min-h-0 p-1 transition-all duration-300 lg:block",
+                                isChatVisible
+                                    ? "opacity-100"
+                                    : "pointer-events-none opacity-0 translate-x-4"
+                            )}
+                        >
+                            <ChatPanelOptimized
+                                onCollapse={() => setIsChatVisible(false)}
+                                isCollapsible
+                            />
+                        </div>
+                    )}
                 </div>
             </section>
         </div>

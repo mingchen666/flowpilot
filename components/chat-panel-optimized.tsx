@@ -1183,7 +1183,7 @@ export default function ChatPanelOptimized({
                                 </div>
                             )}
                             <div
-                                className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden rounded-xl border border-slate-100 bg-white px-2.5 py-2 pb-28"
+                                className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden rounded-xl  bg-white px-2.5 py-2 pb-28"
                                 style={{ maxHeight: '100%' }}
                             >
                                 <ChatMessageDisplay
