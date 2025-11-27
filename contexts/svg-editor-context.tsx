@@ -18,6 +18,8 @@ type Transform = {
     scaleX?: number;
     scaleY?: number;
     rotation?: number;
+    rotationCx?: number;  // 旋转中心点 X
+    rotationCy?: number;  // 旋转中心点 Y
 };
 
 export type SvgElementBase = {
@@ -52,6 +54,13 @@ export type EllipseElement = SvgElementBase & {
     ry: number;
 };
 
+export type CircleElement = SvgElementBase & {
+    type: "circle";
+    cx: number;
+    cy: number;
+    r: number;
+};
+
 export type LineElement = SvgElementBase & {
     type: "line";
     x1: number;
@@ -78,12 +87,40 @@ export type TextElement = SvgElementBase & {
     dominantBaseline?: "auto" | "middle" | "hanging" | "central" | "text-before-edge" | "text-after-edge" | "ideographic" | "alphabetic" | "mathematical";
 };
 
+export type ImageElement = SvgElementBase & {
+    type: "image";
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    href: string;
+    preserveAspectRatio?: string;
+};
+
+export type UseElement = SvgElementBase & {
+    type: "use";
+    x: number;
+    y: number;
+    width?: number;
+    height?: number;
+    href: string;  // 引用的元素 ID (#id)
+};
+
+export type GroupElement = SvgElementBase & {
+    type: "g";
+    children: SvgElement[];
+};
+
 export type SvgElement =
     | RectElement
     | EllipseElement
+    | CircleElement
     | LineElement
     | PathElement
-    | TextElement;
+    | TextElement
+    | ImageElement
+    | UseElement
+    | GroupElement;
 
 type SvgDocument = {
     width: number;
@@ -134,6 +171,9 @@ type SvgEditorContextValue = {
     redo: () => void;
     commitSnapshot: () => void;
     defsMarkup?: string | null;
+    symbolLibrary: Map<string, SvgElement>;  // 存储可复用的元素（用于 <use>）
+    registerSymbol: (id: string, element: SvgElement) => void;
+    resolveUseReference: (href: string) => SvgElement | null;
 };
 
 const DEFAULT_DOC: SvgDocument = {
@@ -171,10 +211,13 @@ function parseTransform(transform: string | null): Transform | undefined {
         if (Number.isFinite(sx)) result.scaleX = sx;
         if (Number.isFinite(sy)) result.scaleY = sy;
     }
+    // 支持 rotate(angle) 和 rotate(angle cx cy) 两种格式
     const rotateMatch = transform.match(/rotate\(([^)]+)\)/);
     if (rotateMatch?.[1]) {
-        const angle = parseFloat(rotateMatch[1]);
-        if (Number.isFinite(angle)) result.rotation = angle;
+        const parts = rotateMatch[1].split(/[\s,]+/).map(parseFloat);
+        if (Number.isFinite(parts[0])) result.rotation = parts[0];
+        if (Number.isFinite(parts[1])) result.rotationCx = parts[1];
+        if (Number.isFinite(parts[2])) result.rotationCy = parts[2];
     }
     return Object.keys(result).length > 0 ? result : undefined;
 }
@@ -195,8 +238,13 @@ function serializeTransform(transform?: Transform): string | undefined {
         const sy = transform.scaleY ?? sx;
         segments.push(`scale(${sx} ${sy})`);
     }
+    // 支持输出完整的 rotate 信息（包括中心点）
     if (Number.isFinite(transform.rotation)) {
-        segments.push(`rotate(${transform.rotation})`);
+        if (Number.isFinite(transform.rotationCx) && Number.isFinite(transform.rotationCy)) {
+            segments.push(`rotate(${transform.rotation} ${transform.rotationCx} ${transform.rotationCy})`);
+        } else {
+            segments.push(`rotate(${transform.rotation})`);
+        }
     }
     return segments.length > 0 ? segments.join(" ") : undefined;
 }
@@ -222,6 +270,8 @@ function elementToMarkup(element: SvgElement): string {
     switch (element.type) {
         case "rect":
             return `<rect id="${element.id}" x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}"${element.rx ? ` rx="${element.rx}"` : ""}${element.ry ? ` ry="${element.ry}"` : ""} ${common}${transformAttr} />`;
+        case "circle":
+            return `<circle id="${element.id}" cx="${element.cx}" cy="${element.cy}" r="${element.r}" ${common}${transformAttr} />`;
         case "ellipse":
             return `<ellipse id="${element.id}" cx="${element.cx}" cy="${element.cy}" rx="${element.rx}" ry="${element.ry}" ${common}${transformAttr} />`;
         case "line":
@@ -230,6 +280,17 @@ function elementToMarkup(element: SvgElement): string {
             return `<path id="${element.id}" d="${element.d}" ${common}${transformAttr} />`;
         case "text":
             return `<text id="${element.id}" x="${element.x}" y="${element.y}" ${element.fontSize ? `font-size="${element.fontSize}"` : ""} ${element.fontWeight ? `font-weight="${element.fontWeight}"` : ""} ${element.textAnchor ? `text-anchor="${element.textAnchor}"` : ""} ${common}${transformAttr}>${element.text}</text>`;
+        case "image":
+            return `<image id="${element.id}" x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" href="${element.href}"${element.preserveAspectRatio ? ` preserveAspectRatio="${element.preserveAspectRatio}"` : ""} ${common}${transformAttr} />`;
+        case "use":
+            return `<use id="${element.id}" href="${element.href}" x="${element.x}" y="${element.y}"${element.width ? ` width="${element.width}"` : ""}${element.height ? ` height="${element.height}"` : ""} ${common}${transformAttr} />`;
+        case "g": {
+            const childrenMarkup = element.children
+                .filter((child) => child.visible !== false)
+                .map(elementToMarkup)
+                .join("\n");
+            return `<g id="${element.id}"${transformAttr ? ` ${transformAttr}` : ""}${common ? ` ${common}` : ""}>${childrenMarkup}</g>`;
+        }
         default:
             return "";
     }
@@ -277,14 +338,12 @@ function parseElement(node: Element, inheritedTransform?: string): SvgElement | 
                 locked: node.getAttribute("data-locked") === "true",
             } as RectElement;
         case "circle": {
-            const r = parseNumber(node.getAttribute("r"));
             return {
                 id: node.getAttribute("id") || nanoid(),
-                type: "ellipse",
+                type: "circle",
                 cx: parseNumber(node.getAttribute("cx")),
                 cy: parseNumber(node.getAttribute("cy")),
-                rx: r,
-                ry: r,
+                r: parseNumber(node.getAttribute("r")),
                 fill: node.getAttribute("fill") || undefined,
                 stroke: node.getAttribute("stroke") || undefined,
                 strokeWidth: parseOptionalNumber(node.getAttribute("stroke-width")),
@@ -295,7 +354,7 @@ function parseElement(node: Element, inheritedTransform?: string): SvgElement | 
                 transform,
                 visible: node.getAttribute("data-visible") !== "false",
                 locked: node.getAttribute("data-locked") === "true",
-            } as EllipseElement;
+            } as CircleElement;
         }
         case "ellipse":
             return {
@@ -406,6 +465,78 @@ function parseElement(node: Element, inheritedTransform?: string): SvgElement | 
                 visible: node.getAttribute("data-visible") !== "false",
                 locked: node.getAttribute("data-locked") === "true",
             } as TextElement;
+        case "image": {
+            const href = node.getAttribute("href") || node.getAttribute("xlink:href") || "";
+            return {
+                id: node.getAttribute("id") || nanoid(),
+                type: "image",
+                x: parseNumber(node.getAttribute("x")),
+                y: parseNumber(node.getAttribute("y")),
+                width: parseNumber(node.getAttribute("width")),
+                height: parseNumber(node.getAttribute("height")),
+                href,
+                preserveAspectRatio: node.getAttribute("preserveAspectRatio") || undefined,
+                fill: node.getAttribute("fill") || undefined,
+                stroke: node.getAttribute("stroke") || undefined,
+                strokeWidth: parseOptionalNumber(node.getAttribute("stroke-width")),
+                opacity: parseOptionalNumber(node.getAttribute("opacity")),
+                transform,
+                visible: node.getAttribute("data-visible") !== "false",
+                locked: node.getAttribute("data-locked") === "true",
+            } as ImageElement;
+        }
+        case "use": {
+            const href = node.getAttribute("href") || node.getAttribute("xlink:href") || "";
+            return {
+                id: node.getAttribute("id") || nanoid(),
+                type: "use",
+                x: parseNumber(node.getAttribute("x")),
+                y: parseNumber(node.getAttribute("y")),
+                width: parseOptionalNumber(node.getAttribute("width")),
+                height: parseOptionalNumber(node.getAttribute("height")),
+                href,
+                fill: node.getAttribute("fill") || undefined,
+                stroke: node.getAttribute("stroke") || undefined,
+                strokeWidth: parseOptionalNumber(node.getAttribute("stroke-width")),
+                opacity: parseOptionalNumber(node.getAttribute("opacity")),
+                transform,
+                visible: node.getAttribute("data-visible") !== "false",
+                locked: node.getAttribute("data-locked") === "true",
+            } as UseElement;
+        }
+        case "g": {
+            const children: SvgElement[] = [];
+            const groupTransform = node.getAttribute("transform");
+            const combinedTransform = [inheritedTransform, groupTransform]
+                .filter(Boolean)
+                .join(" ")
+                .trim();
+            
+            // 递归解析子元素
+            Array.from(node.children).forEach(child => {
+                if (!(child instanceof Element)) return;
+                const tagName = child.tagName.toLowerCase();
+                // 跳过定义元素
+                if (["defs", "symbol", "marker", "pattern", "mask", "clippath", "style", "script", "title", "desc", "metadata"].includes(tagName)) {
+                    return;
+                }
+                const parsed = parseElement(child, combinedTransform);
+                if (parsed) children.push(parsed);
+            });
+            
+            return {
+                id: node.getAttribute("id") || nanoid(),
+                type: "g",
+                children,
+                fill: node.getAttribute("fill") || undefined,
+                stroke: node.getAttribute("stroke") || undefined,
+                strokeWidth: parseOptionalNumber(node.getAttribute("stroke-width")),
+                opacity: parseOptionalNumber(node.getAttribute("opacity")),
+                transform: parseTransform(groupTransform || null),
+                visible: node.getAttribute("data-visible") !== "false",
+                locked: node.getAttribute("data-locked") === "true",
+            } as GroupElement;
+        }
         default:
             return null;
     }
@@ -454,7 +585,26 @@ function parseSvgMarkup(svg: string): { doc: SvgDocument; elements: SvgElement[]
 
     const elements: SvgElement[] = [];
     const defsEl = svgEl.querySelector("defs");
-    const defs = defsEl ? defsEl.innerHTML : null;
+    let defs = defsEl ? defsEl.innerHTML : "";
+    
+    // 收集所有 marker、gradient、filter、pattern 定义（包括 defs 外的）
+    const markerNodes = svgEl.querySelectorAll("marker");
+    const gradientNodes = svgEl.querySelectorAll("linearGradient, radialGradient");
+    const filterNodes = svgEl.querySelectorAll("filter");
+    const patternNodes = svgEl.querySelectorAll("pattern");
+    
+    const additionalDefs: string[] = [];
+    
+    // 收集不在 defs 内的定义元素
+    [...markerNodes, ...gradientNodes, ...filterNodes, ...patternNodes].forEach(node => {
+        if (!defsEl || !defsEl.contains(node)) {
+            additionalDefs.push(node.outerHTML);
+        }
+    });
+    
+    if (additionalDefs.length > 0) {
+        defs = defs + "\n" + additionalDefs.join("\n");
+    }
     const walker = (nodeList: Iterable<Node>, inheritedTransform?: string) => {
         for (const node of nodeList) {
             if (!(node instanceof Element)) continue;
@@ -484,7 +634,7 @@ function parseSvgMarkup(svg: string): { doc: SvgDocument; elements: SvgElement[]
     return {
         doc: { width, height, viewBox: viewBox || `0 0 ${width} ${height}` },
         elements,
-        defs,
+        defs: defs.trim() || null,
         valid: true,
     };
 }
@@ -500,6 +650,7 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
     const [past, setPast] = useState<EditorSnapshot[]>([]);
     const [future, setFuture] = useState<EditorSnapshot[]>([]);
     const [defsMarkup, setDefsMarkup] = useState<string | null>(null);
+    const [symbolLibrary, setSymbolLibrary] = useState<Map<string, SvgElement>>(new Map());
 
     const takeSnapshot = useCallback(
         (
@@ -599,13 +750,21 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
                     switch (el.type) {
                         case "rect":
                             return { x: el.x, y: el.y };
+                        case "circle":
+                            return { x: el.cx, y: el.cy };
                         case "ellipse":
                             return { x: el.cx, y: el.cy };
                         case "line":
                             return null;
                         case "text":
                             return { x: el.x, y: el.y };
+                        case "image":
+                            return { x: el.x, y: el.y };
+                        case "use":
+                            return { x: el.x, y: el.y };
                         case "path":
+                            return { x: el.transform?.x ?? 0, y: el.transform?.y ?? 0 };
+                        case "g":
                             return { x: el.transform?.x ?? 0, y: el.transform?.y ?? 0 };
                         default:
                             return null;
@@ -661,6 +820,8 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
                         switch (element.type) {
                             case "rect":
                                 return { ...element, x: element.x + dx, y: element.y + dy };
+                            case "circle":
+                                return { ...element, cx: element.cx + dx, cy: element.cy + dy };
                             case "ellipse":
                                 return { ...element, cx: element.cx + dx, cy: element.cy + dy };
                             case "line":
@@ -673,7 +834,12 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
                                 };
                             case "text":
                                 return { ...element, x: element.x + dx, y: element.y + dy };
-                            case "path": {
+                            case "image":
+                                return { ...element, x: element.x + dx, y: element.y + dy };
+                            case "use":
+                                return { ...element, x: element.x + dx, y: element.y + dy };
+                            case "path":
+                            case "g": {
                                 const transform = {
                                     ...(element.transform || {}),
                                     x: (element.transform?.x || 0) + dx,
@@ -727,6 +893,10 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
                     clone.x += 12;
                     clone.y += 12;
                     break;
+                case "circle":
+                    clone.cx += 12;
+                    clone.cy += 12;
+                    break;
                 case "ellipse":
                     clone.cx += 12;
                     clone.cy += 12;
@@ -741,7 +911,16 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
                     clone.x += 12;
                     clone.y += 12;
                     break;
+                case "image":
+                    clone.x += 12;
+                    clone.y += 12;
+                    break;
+                case "use":
+                    clone.x += 12;
+                    clone.y += 12;
+                    break;
                 case "path":
+                case "g":
                     clone.transform = {
                         ...(clone.transform || {}),
                         x: (clone.transform?.x || 0) + 12,
@@ -750,6 +929,13 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
                     break;
                 default:
                     break;
+            }
+            // Group 需要递归复制子元素
+            if (clone.type === "g") {
+                clone.children = clone.children.map(child => ({
+                    ...child,
+                    id: nanoid()
+                }));
             }
             setElements((prev) => [...prev, clone]);
             setSelectedId(clone.id);
@@ -778,6 +964,10 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
                             clone.x += 12;
                             clone.y += 12;
                             break;
+                        case "circle":
+                            clone.cx += 12;
+                            clone.cy += 12;
+                            break;
                         case "ellipse":
                             clone.cx += 12;
                             clone.cy += 12;
@@ -792,7 +982,16 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
                             clone.x += 12;
                             clone.y += 12;
                             break;
+                        case "image":
+                            clone.x += 12;
+                            clone.y += 12;
+                            break;
+                        case "use":
+                            clone.x += 12;
+                            clone.y += 12;
+                            break;
                         case "path":
+                        case "g":
                             clone.transform = {
                                 ...(clone.transform || {}),
                                 x: (clone.transform?.x || 0) + 12,
@@ -801,6 +1000,13 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
                             break;
                         default:
                             break;
+                    }
+                    // Group 需要递归复制子元素
+                    if (clone.type === "g") {
+                        clone.children = clone.children.map(child => ({
+                            ...child,
+                            id: nanoid()
+                        }));
                     }
                     created.push(clone.id);
                     next.push(clone);
@@ -910,6 +1116,19 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
         });
     }, [takeSnapshot]);
 
+    const registerSymbol = useCallback((id: string, element: SvgElement) => {
+        setSymbolLibrary((prev) => {
+            const next = new Map(prev);
+            next.set(id, element);
+            return next;
+        });
+    }, []);
+
+    const resolveUseReference = useCallback((href: string): SvgElement | null => {
+        const id = href.startsWith("#") ? href.slice(1) : href;
+        return symbolLibrary.get(id) || null;
+    }, [symbolLibrary]);
+
     const value = useMemo(
         () => ({
             doc,
@@ -938,6 +1157,9 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
             redo,
             commitSnapshot: () => pushHistorySnapshot(),
             defsMarkup,
+            symbolLibrary,
+            registerSymbol,
+            resolveUseReference,
         }),
         [
             doc,
@@ -963,6 +1185,9 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
             redo,
             pushHistorySnapshot,
             defsMarkup,
+            symbolLibrary,
+            registerSymbol,
+            resolveUseReference,
         ]
     );
 
