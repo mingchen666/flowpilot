@@ -37,12 +37,6 @@ import type {
     EndpointModelDraft,
     ModelValidationResult,
 } from "@/types/model-config";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 // iOS-style Switch
 function Switch({ checked, onCheckedChange, disabled }: {
@@ -234,13 +228,32 @@ export function ModelConfigDialog({
     };
 
     const handleEndpointChange = (endpointId: string, patch: Partial<ModelEndpointDraft>) => {
-        setDrafts(prev => prev.map(e => e.id === endpointId ? { ...e, ...patch } : e));
+        setDrafts(prev => prev.map(e => {
+            if (e.id !== endpointId) return e;
+            const updated = { ...e, ...patch };
+            // 如果修改了关键配置，重置该接口下所有模型的验证状态
+            if (patch.baseUrl !== undefined || patch.apiKey !== undefined) {
+                updated.models = updated.models.map(m => ({ ...m, isValidated: false }));
+            }
+            return updated;
+        }));
     };
 
     const handleModelChange = (endpointId: string, modelId: string, patch: Partial<EndpointModelDraft>) => {
         setDrafts(prev => prev.map(e =>
             e.id === endpointId
-                ? { ...e, models: e.models.map(m => m.id === modelId ? { ...m, ...patch } : m) }
+                ? {
+                    ...e,
+                    models: e.models.map(m => {
+                        if (m.id !== modelId) return m;
+                        const updated = { ...m, ...patch };
+                        // 如果修改了模型ID，重置验证状态
+                        if (patch.modelId !== undefined) {
+                            updated.isValidated = false;
+                        }
+                        return updated;
+                    })
+                }
                 : e
         ));
     };
@@ -277,32 +290,23 @@ export function ModelConfigDialog({
 
     const handleSave = () => {
         setGlobalError(null);
-        const validDrafts = drafts.filter(endpoint => {
-            const issues = validateEndpoint(endpoint);
-            const validatedModels = endpoint.models.filter(model => {
-                const validationKey = `${endpoint.id}:${model.id}`;
-                return validationStates[validationKey] === 'success';
-            });
 
-            // 如果有验证通过的模型，或者配置完整但未验证（允许保存但提示警告，这里简化为只保存验证通过的）
-            // 用户逻辑：只保存验证通过的模型
-            return validatedModels.length > 0;
-        });
+        // 验证新增模型
+        for (const endpoint of drafts) {
+            for (const model of endpoint.models) {
+                // 检查是否为已存在的模型（通过 ID 判断）
+                const isExisting = endpoints.some(e => e.models.some(m => m.id === model.id));
 
-        if (validDrafts.length === 0 && drafts.length > 0) {
-            setGlobalError("请至少配置并验证通过一个模型");
-            return;
+                // 如果是新增模型且未通过验证，则阻止保存
+                if (!isExisting && !model.isValidated) {
+                    setGlobalError(`新增模型 "${model.modelId || '未命名'}" 必须先通过验证`);
+                    return;
+                }
+            }
         }
 
-        const cleanedDrafts = validDrafts.map(endpoint => ({
-            ...endpoint,
-            models: endpoint.models.filter(model => {
-                const validationKey = `${endpoint.id}:${model.id}`;
-                return validationStates[validationKey] === 'success';
-            }),
-        }));
-
-        onSave(cleanedDrafts);
+        // 保存所有配置（包括未验证的旧模型）
+        onSave(drafts);
         onOpenChange(false);
     };
 
@@ -368,50 +372,54 @@ export function ModelConfigDialog({
                         <>
                             {/* Header / Config */}
                             <div className="border-b border-slate-200 bg-white px-6 py-5">
-                                <div className="mb-6 flex items-center justify-between">
-                                    <input
-                                        type="text"
-                                        value={selectedEndpoint.name}
-                                        onChange={(e) => handleEndpointChange(selectedEndpoint.id, { name: e.target.value })}
-                                        className="bg-transparent text-xl font-semibold text-slate-900 placeholder:text-slate-400 focus:outline-none"
-                                        placeholder="接口名称"
-                                    />
+                                <div className="mb-6 flex items-center justify-between gap-4">
+                                    <div className="flex-1 group relative">
+                                        <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                            <Settings2 className="h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={selectedEndpoint.name}
+                                            onChange={(e) => handleEndpointChange(selectedEndpoint.id, { name: e.target.value })}
+                                            className="w-full rounded-xl border border-transparent bg-slate-50 py-2 pl-10 pr-4 text-lg font-semibold text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 hover:bg-slate-100 transition-all"
+                                            placeholder="输入接口名称..."
+                                        />
+                                    </div>
                                     <div className="flex items-center gap-2">
                                         <Button
                                             size="sm"
                                             variant="outline"
                                             onClick={() => validateAllModels(selectedEndpoint.id)}
-                                            className="h-8 gap-1.5 rounded-full text-xs font-medium"
+                                            className="h-9 gap-1.5 rounded-lg border-slate-200 text-slate-600 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
                                         >
-                                            <ShieldCheck className="h-3.5 w-3.5" />
+                                            <ShieldCheck className="h-4 w-4" />
                                             验证全部
                                         </Button>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8 rounded-full">
-                                                    <MoreHorizontal className="h-4 w-4 text-slate-500" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="w-40">
-                                                <DropdownMenuItem onClick={() => {
-                                                    const newEndpoint = cloneEndpoint(selectedEndpoint);
-                                                    newEndpoint.id = `endpoint-${nanoid(6)}`;
-                                                    newEndpoint.name = `${selectedEndpoint.name} 副本`;
-                                                    setDrafts(prev => [...prev, newEndpoint]);
-                                                }}>
-                                                    <Copy className="mr-2 h-4 w-4" />
-                                                    复制接口
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    className="text-red-600 focus:text-red-600"
-                                                    onClick={() => handleRemoveEndpoint(selectedEndpoint.id)}
-                                                    disabled={drafts.length <= 1}
-                                                >
-                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                    删除接口
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                        <div className="h-6 w-px bg-slate-200 mx-1" />
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => {
+                                                const newEndpoint = cloneEndpoint(selectedEndpoint);
+                                                newEndpoint.id = `endpoint-${nanoid(6)}`;
+                                                newEndpoint.name = `${selectedEndpoint.name} 副本`;
+                                                setDrafts(prev => [...prev, newEndpoint]);
+                                            }}
+                                            className="h-9 w-9 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+                                            title="复制接口"
+                                        >
+                                            <Copy className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => handleRemoveEndpoint(selectedEndpoint.id)}
+                                            disabled={drafts.length <= 1}
+                                            className="h-9 w-9 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                                            title="删除接口"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
                                     </div>
                                 </div>
 
@@ -526,11 +534,11 @@ export function ModelConfigDialog({
                                                                 />
                                                             </td>
                                                             <td className="px-4 py-2">
-                                                                <div className="flex items-center gap-2">
+                                                                <div className="flex items-center gap-2 whitespace-nowrap">
                                                                     <button
                                                                         onClick={() => validateModel(selectedEndpoint.id, model.id)}
                                                                         className={cn(
-                                                                            "flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium transition-colors",
+                                                                            "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors shrink-0",
                                                                             status === 'success' ? "bg-green-100 text-green-700" :
                                                                                 status === 'error' ? "bg-red-100 text-red-700" :
                                                                                     status === 'validating' ? "bg-blue-100 text-blue-700" :
@@ -546,7 +554,7 @@ export function ModelConfigDialog({
                                                                                 status === 'success' ? '通过' : '失败'}
                                                                     </button>
                                                                     {status === 'success' && result?.details && typeof result.details === 'object' && (
-                                                                        <span className="text-[10px] text-slate-400">{result.details.responseTime}</span>
+                                                                        <span className="text-[10px] text-slate-400 font-mono shrink-0">{result.details.responseTime}</span>
                                                                     )}
                                                                 </div>
                                                             </td>

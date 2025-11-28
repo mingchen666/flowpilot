@@ -117,18 +117,18 @@ export function useComparisonWorkbench({
             const validatedModels = prev.models
                 .map(key => normalizeModelKey(key))
                 .filter(Boolean);
-            
+
             // 确保至少有2个模型
             while (validatedModels.length < 2) {
                 validatedModels.push(normalizeModelKey());
             }
-            
+
             // 检查是否有变化
             if (validatedModels.length === prev.models.length &&
                 validatedModels.every((key, idx) => key === prev.models[idx])) {
                 return prev;
             }
-            
+
             return {
                 models: validatedModels,
             };
@@ -180,10 +180,10 @@ export function useComparisonWorkbench({
                     const nextResults = entry.results.map((result) =>
                         result.status === "loading"
                             ? {
-                                  ...result,
-                                  status: "cancelled" as const,
-                                  error: pauseReason,
-                              }
+                                ...result,
+                                status: "cancelled" as const,
+                                error: pauseReason,
+                            }
                             : result
                     );
                     const nextStatus = nextResults.every(
@@ -291,36 +291,36 @@ export function useComparisonWorkbench({
                 console.error("无效的 requestId");
                 return {};
             }
-            
+
             if (!Array.isArray(results)) {
                 console.error("results 必须是数组");
                 return {};
             }
-            
+
             if (!originBranchId || typeof originBranchId !== 'string') {
                 console.error("无效的 originBranchId");
                 return {};
             }
-            
+
             if (!Array.isArray(seedMessages)) {
                 console.warn("seedMessages 不是数组，使用空数组");
                 seedMessages = [];
             }
-            
+
             const bindings: Record<string, string> = {};
             results.forEach((result) => {
                 // 只为成功的结果创建分支
                 if (result.status !== "ok" || !result.xml) {
                     return;
                 }
-                
+
                 const label =
                     result.label?.trim()?.length
                         ? `${result.label} · 分支`
                         : result.slot
-                        ? `模型 ${result.slot} · 分支`
-                        : `对比结果 · 分支`;
-                        
+                            ? `模型 ${result.slot} · 分支`
+                            : `对比结果 · 分支`;
+
                 const branch = createBranch({
                     parentId: originBranchId,
                     label,
@@ -417,9 +417,9 @@ export function useComparisonWorkbench({
                 );
                 const previewImage = ensureString(
                     item?.previewImage ??
-                        item?.image ??
-                        item?.thumbnail ??
-                        item?.previewUrl
+                    item?.image ??
+                    item?.thumbnail ??
+                    item?.previewUrl
                 );
                 const rawId = ensureString(item?.id) ?? model.id;
                 const resultId = `${model.key}__${model.slot}`;
@@ -565,20 +565,20 @@ export function useComparisonWorkbench({
                     origin: "display",
                     modelRuntime: result.runtime,
                 });
-                
+
                 // 边界检查：确保有有效的消息历史
                 const branchMessages = cloneMessages(activeBranch?.messages ?? []);
                 const relatedEntry = comparisonHistory.find((entry) =>
                     entry.results.some((item) => item.id === result.id)
                 );
-                
+
                 // 生成合理的分支标签
                 const branchLabel = result.label?.trim()?.length
                     ? `${result.label} · 分支`
                     : result.slot
-                    ? `模型 ${result.slot} · 分支`
-                    : `对比结果 · 分支`;
-                    
+                        ? `模型 ${result.slot} · 分支`
+                        : `对比结果 · 分支`;
+
                 const created = createBranch({
                     label: branchLabel,
                     diagramXml: trimmedXml,
@@ -590,13 +590,13 @@ export function useComparisonWorkbench({
                     },
                     seedMessages: branchMessages,
                 });
-                
+
                 if (created) {
                     attachBranchToResult(result.id, created.id);
                 } else {
                     console.warn("创建分支失败，但图表已应用");
                 }
-                
+
                 if (relatedEntry?.requestId) {
                     updateComparisonEntry(relatedEntry.requestId, (entry) => {
                         if (entry.adoptedResultId === result.id) {
@@ -716,7 +716,7 @@ export function useComparisonWorkbench({
 
         // 从配置中获取所有选中的模型
         const resolvedOptions: RuntimeModelOption[] = [];
-        
+
         // 允许相同模型重复出现，以便用户测试同一模型的随机性/稳定性
         for (const modelKey of comparisonConfig.models) {
             const option = getModelOption(modelKey);
@@ -795,20 +795,20 @@ export function useComparisonWorkbench({
             const attachments =
                 files.length > 0 ? await serializeAttachments(files) : [];
 
-        const requestBody: Record<string, any> = {
-            models: modelsMeta.map((model) => ({
-                id: model.id,
-                key: model.key,
-                label: model.label,
-                provider: model.provider,
-                slot: model.slot,
-                runtime: model.runtime,
-            })),
-            prompt: enrichedInput,
-            xml: chartXml,
-            brief: briefContext.prompt,
-            renderMode,
-        };
+            const requestBody: Record<string, any> = {
+                models: modelsMeta.map((model) => ({
+                    id: model.id,
+                    key: model.key,
+                    label: model.label,
+                    provider: model.provider,
+                    slot: model.slot,
+                    runtime: model.runtime,
+                })),
+                prompt: enrichedInput,
+                xml: chartXml,
+                brief: briefContext.prompt,
+                renderMode,
+            };
 
             if (attachments.length > 0) {
                 requestBody.attachments = attachments;
@@ -959,7 +959,7 @@ export function useComparisonWorkbench({
             ) {
                 return;
             }
-            
+
             // 检查该result是否已经在loading中（防止重复点击）
             const currentEntry = comparisonHistory.find(e => e.requestId === entry.requestId);
             const currentResult = currentEntry?.results.find(r => r.id === targetResult.id);
@@ -970,7 +970,7 @@ export function useComparisonWorkbench({
                 );
                 return;
             }
-            
+
             if (!entry || !targetResult) {
                 return;
             }
@@ -986,15 +986,15 @@ export function useComparisonWorkbench({
                 results: current.results.map((item) =>
                     item.id === targetResult.id
                         ? {
-                              ...item,
-                              status: "loading",
-                              summary: "",
-                              xml: undefined,
-                              encodedXml: undefined,
-                              previewSvg: undefined,
-                              previewImage: undefined,
-                              error: undefined,
-                          }
+                            ...item,
+                            status: "loading",
+                            summary: "",
+                            xml: undefined,
+                            encodedXml: undefined,
+                            previewSvg: undefined,
+                            previewImage: undefined,
+                            error: undefined,
+                        }
                         : item
                 ),
             }));
@@ -1084,14 +1084,14 @@ export function useComparisonWorkbench({
                     results: current.results.map((item) =>
                         item.id === targetResult.id
                             ? {
-                                  ...item,
-                                  status: "error",
-                                  xml: undefined,
-                                  encodedXml: undefined,
-                                  previewSvg: undefined,
-                                  previewImage: undefined,
-                                  error: message,
-                              }
+                                ...item,
+                                status: "error",
+                                xml: undefined,
+                                encodedXml: undefined,
+                                previewSvg: undefined,
+                                previewImage: undefined,
+                                error: message,
+                            }
                             : item
                     ),
                 }));

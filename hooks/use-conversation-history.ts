@@ -58,7 +58,7 @@ export function useConversationHistory() {
     // 找到第一条用户消息
     const firstUserMessage = messagesData.find(msg => msg.role === "user");
     if (!firstUserMessage) return "新对话";
-    
+
     // 尝试提取文本内容
     let text = "";
     if (typeof firstUserMessage.content === "string") {
@@ -74,12 +74,12 @@ export function useConversationHistory() {
         text = textPart.displayText || textPart.text;
       }
     }
-    
+
     if (text) {
       // 取前20个字符作为标题
       return text.slice(0, 20) + (text.length > 20 ? "..." : "");
     }
-    
+
     return "新对话";
   }, []);
 
@@ -102,7 +102,7 @@ export function useConversationHistory() {
       svg?: string;
       mode: "drawio" | "svg";
     }> = [];
-    
+
     if (diagramResults) {
       diagramResults.forEach((data, id) => {
         diagramResultsArray.push({
@@ -131,7 +131,7 @@ export function useConversationHistory() {
       const updated = [conversationItem, ...prev];
       // 只保留最新的 MAX_CONVERSATIONS 条
       const trimmed = updated.slice(0, MAX_CONVERSATIONS);
-      
+
       saveToStorage(trimmed);
       return trimmed;
     });

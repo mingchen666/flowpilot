@@ -24,7 +24,7 @@ export function ToolPanelSidebar({
 
     return (
         <div className="pointer-events-none absolute inset-0 flex items-start justify-end px-2 pb-3 pt-3">
-            <aside className="pointer-events-auto w-full max-w-full rounded-2xl border border-slate-100/80 bg-white/95 p-4 shadow-xl ring-1 ring-slate-900/5 sm:max-w-lg md:w-[600px] md:max-w-[90vw]">
+            <aside className="pointer-events-auto w-full max-w-full rounded-2xl border border-slate-100/80 bg-white/95 p-4 shadow-xl ring-1 ring-slate-900/5 sm:max-w-lg md:max-w-[600px]">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <Icon className="h-4 w-4 text-slate-400" />

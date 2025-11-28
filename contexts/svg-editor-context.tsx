@@ -567,24 +567,29 @@ function parseElement(node: Element, inheritedTransform?: string): SvgElement | 
             } as UseElement;
         }
         case "g": {
-            const children: SvgElement[] = [];
             const groupTransform = node.getAttribute("transform");
-            const combinedTransform = [inheritedTransform, groupTransform]
-                .filter(Boolean)
-                .join(" ")
-                .trim();
+            // const combinedTransform = [inheritedTransform, groupTransform].filter(Boolean).join(" ").trim();
 
-            // 递归解析子元素
-            Array.from(node.children).forEach(child => {
+            const children: SvgElement[] = [];
+            // console.log(`[parseElement] Parsing group: ${node.id}, children count: ${node.children.length}`);
+            // console.log(`[parseElement] Group outerHTML: ${node.outerHTML.slice(0, 100)}`);
+
+            Array.from(node.children).forEach((child) => {
                 if (!(child instanceof Element)) return;
                 const tagName = child.tagName.toLowerCase();
                 // 跳过定义元素
                 if (["defs", "symbol", "marker", "pattern", "mask", "clippath", "style", "script", "title", "desc", "metadata"].includes(tagName)) {
                     return;
                 }
-                const parsed = parseElement(child, combinedTransform);
-                if (parsed) children.push(parsed);
+                // Don't pass combinedTransform to children, as they will inherit it from the group element itself
+                const parsed = parseElement(child, undefined);
+                if (parsed) {
+                    children.push(parsed);
+                } else {
+                    // console.log(`[parseElement] Failed to parse child: ${tagName}`);
+                }
             });
+            // console.log(`[parseElement] Group parsed with ${children.length} children`);
 
             return {
                 id: node.getAttribute("id") || nanoid(),
@@ -593,6 +598,7 @@ function parseElement(node: Element, inheritedTransform?: string): SvgElement | 
                 fill: node.getAttribute("fill") || undefined,
                 stroke: node.getAttribute("stroke") || undefined,
                 strokeWidth: parseOptionalNumber(node.getAttribute("stroke-width")),
+                strokeDasharray: node.getAttribute("stroke-dasharray") || undefined,
                 strokeLinecap: (node.getAttribute("stroke-linecap") as any) || undefined,
                 strokeLinejoin: (node.getAttribute("stroke-linejoin") as any) || undefined,
                 strokeMiterlimit: parseOptionalNumber(node.getAttribute("stroke-miterlimit")),
@@ -623,6 +629,22 @@ function decodeSvgContent(svg: string): string {
     return trimmed;
 }
 
+function removeDuplicateAttributes(svg: string): string {
+    // 匹配标签开始部分 <tag ... >
+    return svg.replace(/<([a-zA-Z0-9:-]+)([^>]+)>/g, (match, tagName, attributes) => {
+        const seen = new Set<string>();
+        // 匹配属性 key="value" 或 key='value' 或 key=value
+        const cleanedAttributes = attributes.replace(/([a-zA-Z0-9:-]+)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/g, (attrMatch: string, name: string, value: string) => {
+            if (seen.has(name)) {
+                return ""; // 移除重复属性
+            }
+            seen.add(name);
+            return attrMatch;
+        });
+        return `<${tagName}${cleanedAttributes}>`;
+    });
+}
+
 function parseSvgMarkup(svg: string): { doc: SvgDocument; elements: SvgElement[]; defs?: string | null; valid: boolean } {
     console.log("Parsing SVG...", svg.slice(0, 200));
     let normalized = decodeSvgContent(svg);
@@ -631,8 +653,18 @@ function parseSvgMarkup(svg: string): { doc: SvgDocument; elements: SvgElement[]
     // 匹配 & 后面不是 (字母/数字/# 开头 + ;) 的情况
     normalized = normalized.replace(/&(?![a-zA-Z0-9#]+;)/g, "&amp;");
 
+    // 移除重复属性 (修复 Attribute redefined 错误)
+    normalized = removeDuplicateAttributes(normalized);
+
     const parser = new DOMParser();
     const parsed = parser.parseFromString(normalized, "image/svg+xml");
+
+    const parserError = parsed.querySelector("parsererror");
+    if (parserError) {
+        console.error("DOMParser error:", parserError.textContent);
+        console.log("Normalized SVG:", normalized);
+    }
+
     const svgEl = parsed.querySelector("svg");
     if (!svgEl) {
         console.warn("SVG 内容缺少 <svg> 根节点，忽略载入。内容片段：", normalized.slice(0, 120));
@@ -695,7 +727,7 @@ function parseSvgMarkup(svg: string): { doc: SvgDocument; elements: SvgElement[]
             if (parsedElement) {
                 elements.push(parsedElement);
             }
-            if (node.children && node.children.length > 0) {
+            if (node.children && node.children.length > 0 && tagName !== "g") {
                 walker(Array.from(node.children), nextTransform || undefined);
             }
         }

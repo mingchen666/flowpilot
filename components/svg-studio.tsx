@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     MousePointer2,
     Square,
@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { EnhancedSvgImportDialog } from "@/components/enhanced-svg-import-dialog";
+import { SvgElementRenderer } from "@/components/svg-element-renderer";
 
 type DraftShape =
     | {
@@ -143,22 +144,7 @@ function getBounds(element: SvgElement): { x: number; y: number; width: number; 
     }
 }
 
-function transformStyle(element: SvgElement) {
-    if (!element.transform) return undefined;
-    const parts: string[] = [];
-    if (element.transform.x || element.transform.y) {
-        parts.push(`translate(${element.transform.x || 0} ${element.transform.y || 0})`);
-    }
-    if (element.transform.scaleX || element.transform.scaleY) {
-        const sx = element.transform.scaleX ?? 1;
-        const sy = element.transform.scaleY ?? sx;
-        parts.push(`scale(${sx} ${sy})`);
-    }
-    if (element.transform.rotation) {
-        parts.push(`rotate(${element.transform.rotation})`);
-    }
-    return parts.length > 0 ? parts.join(" ") : undefined;
-}
+
 
 export function SvgStudio() {
     const {
@@ -1572,257 +1558,18 @@ export function SvgStudio() {
                                 {defsMarkup && (
                                     <defs dangerouslySetInnerHTML={{ __html: defsMarkup }} />
                                 )}
-                                {elements.map((element) => {
-                                    if (element.visible === false) return null;
-                                    const transform = transformStyle(element);
-                                    const commonProps = {
-                                        ref: (node: SVGGraphicsElement | null) => {
-                                            elementRefs.current[element.id] = node;
-                                        },
-                                        onPointerDown: (event: React.PointerEvent) =>
-                                            handleElementPointerDown(event, element),
-                                        transform,
-                                        className: cn(
-                                            "cursor-default",
-                                            (selectedIds.has(element.id) || selectedId === element.id) &&
-                                            "outline-none ring-2 ring-offset-2 ring-blue-500/50"
-                                        ),
-                                    } as const;
-                                    switch (element.type) {
-                                        case "rect":
-                                            return (
-                                                <rect
-                                                    key={element.id}
-                                                    {...commonProps}
-                                                    x={element.x}
-                                                    y={element.y}
-                                                    width={element.width}
-                                                    height={element.height}
-                                                    rx={element.rx}
-                                                    ry={element.ry}
-                                                    fill={element.fill || "none"}
-                                                    stroke={element.stroke}
-                                                    strokeWidth={element.strokeWidth || 1.4}
-                                                    strokeDasharray={element.strokeDasharray}
-                                                    strokeLinecap={element.strokeLinecap}
-                                                    strokeLinejoin={element.strokeLinejoin}
-                                                    markerEnd={element.markerEnd}
-                                                    markerStart={element.markerStart}
-                                                    opacity={element.opacity}
-                                                    filter={element.filter}
-                                                />
-                                            );
-                                        case "circle":
-                                            return (
-                                                <circle
-                                                    key={element.id}
-                                                    {...commonProps}
-                                                    cx={element.cx}
-                                                    cy={element.cy}
-                                                    r={element.r}
-                                                    fill={element.fill || "none"}
-                                                    stroke={element.stroke}
-                                                    strokeWidth={element.strokeWidth || 1.4}
-                                                    strokeDasharray={element.strokeDasharray}
-                                                    strokeLinecap={element.strokeLinecap}
-                                                    strokeLinejoin={element.strokeLinejoin}
-                                                    markerEnd={element.markerEnd}
-                                                    markerStart={element.markerStart}
-                                                    opacity={element.opacity}
-                                                    filter={element.filter}
-                                                />
-                                            );
-                                        case "ellipse":
-                                            return (
-                                                <ellipse
-                                                    key={element.id}
-                                                    {...commonProps}
-                                                    cx={element.cx}
-                                                    cy={element.cy}
-                                                    rx={element.rx}
-                                                    ry={element.ry}
-                                                    fill={element.fill || "none"}
-                                                    stroke={element.stroke}
-                                                    strokeWidth={element.strokeWidth || 1.4}
-                                                    strokeDasharray={element.strokeDasharray}
-                                                    strokeLinecap={element.strokeLinecap}
-                                                    strokeLinejoin={element.strokeLinejoin}
-                                                    markerEnd={element.markerEnd}
-                                                    markerStart={element.markerStart}
-                                                    opacity={element.opacity}
-                                                    filter={element.filter}
-                                                />
-                                            );
-                                        case "line":
-                                            return (
-                                                <React.Fragment key={element.id}>
-                                                    <line
-                                                        x1={element.x1}
-                                                        y1={element.y1}
-                                                        x2={element.x2}
-                                                        y2={element.y2}
-                                                        stroke="transparent"
-                                                        strokeWidth={12}
-                                                        className="cursor-pointer"
-                                                        transform={transform}
-                                                        onPointerDown={(event) =>
-                                                            handleElementPointerDown(event, element)
-                                                        }
-                                                    />
-                                                    <line
-                                                        {...commonProps}
-                                                        x1={element.x1}
-                                                        y1={element.y1}
-                                                        x2={element.x2}
-                                                        y2={element.y2}
-                                                        stroke={element.stroke}
-                                                        strokeWidth={element.strokeWidth || 1.6}
-                                                        strokeDasharray={element.strokeDasharray}
-                                                        strokeLinecap={element.strokeLinecap}
-                                                        strokeLinejoin={element.strokeLinejoin}
-                                                        markerEnd={element.markerEnd}
-                                                        markerStart={element.markerStart}
-                                                        opacity={element.opacity}
-                                                        filter={element.filter}
-                                                        pointerEvents="none"
-                                                    />
-                                                </React.Fragment>
-                                            );
-                                        case "path":
-                                            return (
-                                                <path
-                                                    key={element.id}
-                                                    {...commonProps}
-                                                    d={element.d}
-                                                    fill={element.fill || "none"}
-                                                    stroke={element.stroke}
-                                                    strokeWidth={element.strokeWidth || 1.4}
-                                                    strokeDasharray={element.strokeDasharray}
-                                                    strokeLinecap={element.strokeLinecap}
-                                                    strokeLinejoin={element.strokeLinejoin}
-                                                    markerEnd={element.markerEnd}
-                                                    markerStart={element.markerStart}
-                                                    opacity={element.opacity}
-                                                    filter={element.filter}
-                                                />
-                                            );
-                                        case "text":
-                                            return (
-                                                <text
-                                                    key={element.id}
-                                                    {...commonProps}
-                                                    x={element.x}
-                                                    y={element.y}
-                                                    fill={element.fill || "#0f172a"}
-                                                    fontSize={element.fontSize || 16}
-                                                    fontWeight={element.fontWeight}
-                                                    fontFamily={element.fontFamily}
-                                                    textAnchor={element.textAnchor}
-                                                    dominantBaseline={element.dominantBaseline}
-                                                    filter={element.filter}
-                                                    className={cn(
-                                                        "select-none",
-                                                        element.visible === (false as any) && "opacity-30"
-                                                    )}
-                                                >
-                                                    {element.text}
-                                                </text>
-                                            );
-                                        case "image":
-                                            return (
-                                                <image
-                                                    key={element.id}
-                                                    {...commonProps}
-                                                    x={element.x}
-                                                    y={element.y}
-                                                    width={element.width}
-                                                    height={element.height}
-                                                    href={element.href}
-                                                    preserveAspectRatio={element.preserveAspectRatio}
-                                                    opacity={element.opacity}
-                                                    filter={element.filter}
-                                                />
-                                            );
-                                        case "use":
-                                            return (
-                                                <use
-                                                    key={element.id}
-                                                    {...commonProps}
-                                                    href={element.href}
-                                                    x={element.x}
-                                                    y={element.y}
-                                                    width={element.width}
-                                                    height={element.height}
-                                                    fill={element.fill}
-                                                    stroke={element.stroke}
-                                                    strokeWidth={element.strokeWidth}
-                                                    opacity={element.opacity}
-                                                    filter={element.filter}
-                                                />
-                                            );
-                                        case "g":
-                                            // Group rendering is complex as it needs recursion or flattening.
-                                            // For now, we can skip or implement simple recursion if needed.
-                                            // Given the context, let's just render children?
-                                            // But children are in the flat `elements` list usually?
-                                            // Wait, `parseElement` returns a tree for `g`, but `SvgEditorContext` flattens?
-                                            // Let's check `parseSvgMarkup`.
-                                            // `walker` flattens everything into `elements`.
-                                            // So `g` elements in `elements` array are likely just containers or maybe not even there if flattened?
-                                            // Looking at `parseElement` for `g`: it returns a `GroupElement` with `children`.
-                                            // But `walker` recursively adds children to `elements` list.
-                                            // If `walker` adds children to the main list, then we shouldn't render `g`'s children again if they are already in the main list.
-                                            // However, `walker` adds `parsedElement` (the group) AND then recurses.
-                                            // So we have both the group and its children in the flat list?
-                                            // If so, we might have double rendering if we render children here.
-                                            // But `walker` logic:
-                                            // `elements.push(parsedElement)` -> pushes the group.
-                                            // `walker(node.children)` -> pushes children.
-                                            // So yes, both are in the list.
-                                            // But wait, `GroupElement` has `children` property.
-                                            // If we render `g`, we should render its children inside it?
-                                            // If the children are ALSO in the top-level `elements` list, they will be rendered twice?
-                                            // Let's check `parseSvgMarkup` again.
-                                            // It pushes `parsedElement` (which includes `children` array populated in `parseElement`).
-                                            // Then it calls `walker` on children.
-                                            // So yes, duplication.
-                                            // BUT, `parseElement` for `g` creates a NEW array of children `const children: SvgElement[] = []`.
-                                            // It does NOT use the same references as the ones pushed to the main list later?
-                                            // Actually `parseElement` calls `parseElement` recursively for children to populate `children` array.
-                                            // So we have two sets of objects: one inside the group's `children` array, and one in the main `elements` list.
-                                            // This seems like a bug in `parseSvgMarkup` or intended for different usage.
-                                            // If `SvgStudio` iterates over `elements`, it will encounter the group AND the children.
-                                            // If we render the group AND the children (as separate elements), we get double rendering.
-                                            // Usually, if we have a flat list, we ignore `g` or `g` is just for transform?
-                                            // But `g` has `children`.
-                                            // If we render `g`, we should probably NOT render its children if they are already in the list.
-                                            // OR, we should filter out children from the main list if they are inside a group?
-                                            // Let's look at `SvgEditorContext` again.
-                                            // `walker` pushes everything.
-                                            // So `elements` contains everything flattened.
-                                            // If we render `g`, we should probably just render it as a group container?
-                                            // But if its children are also in `elements`, they will be rendered at top level.
-                                            // If `g` has a transform, the top-level children need that transform.
-                                            // `parseElement` calculates `combinedTransform` for children!
-                                            // `const nextTransform = [inheritedTransform, node.getAttribute("transform")]...`
-                                            // So the children in the flat list ALREADY have the group's transform applied (baked in or accumulated).
-                                            // So we should NOT render `g`'s children inside `g`.
-                                            // We should probably just ignore `g` for rendering if its children are already handled.
-                                            // OR, if `g` has styles (fill, stroke) that inherit?
-                                            // `parseElement` does NOT seem to pass down fill/stroke to children explicitly, only transform.
-                                            // So if `g` has `fill="red"`, children should inherit it.
-                                            // But if children are rendered separately, they won't inherit unless we resolved it.
-                                            // The current `parseElement` does NOT resolve inherited styles.
-                                            // This might be another issue, but for now let's stick to the user's request: "face outline missing".
-                                            // The face is a `circle`.
-                                            // So adding `circle` case is the priority.
-                                            // I will also add `image` and `use` as they are simple.
-                                            // I will leave `g` alone for now to avoid breaking things, or just return null for `g`.
-                                            return null;
-                                        default:
-                                            return null;
-                                    }
-                                })}
+                                {elements.map((element) => (
+                                    <SvgElementRenderer
+                                        key={element.id}
+                                        element={element}
+                                        selectedIds={selectedIds}
+                                        selectedId={selectedId}
+                                        onPointerDown={handleElementPointerDown}
+                                        registerRef={(id, node) => {
+                                            elementRefs.current[id] = node;
+                                        }}
+                                    />
+                                ))}
 
                                 {draftShape}
 

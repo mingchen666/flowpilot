@@ -1468,7 +1468,7 @@ export default function ChatPanelOptimized({
                             onOpenSettings={() => setIsBriefDialogOpen(true)}
                             disabled={status === "streaming"}
                         />
-                        
+
                         <div className="w-full rounded-2xl shadow-xl">
                             <ChatInputOptimized
                                 input={input}
