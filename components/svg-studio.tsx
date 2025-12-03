@@ -263,6 +263,7 @@ export function SvgStudio() {
         duplicateMany,
         removeMany,
         defsMarkup,
+        streamingSvgContent,
     } = useSvgEditor();
     const svgRef = useRef<SVGSVGElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -1704,21 +1705,27 @@ export function SvgStudio() {
                             <rect width="100%" height="100%" fill="url(#grid)" />
 
                             <g transform={`translate(${pan.x}, ${pan.y}) scale(${zoom})`}>
-                                {defsMarkup && (
-                                    <defs dangerouslySetInnerHTML={{ __html: defsMarkup }} />
+                                {streamingSvgContent ? (
+                                    <g dangerouslySetInnerHTML={{ __html: streamingSvgContent }} />
+                                ) : (
+                                    <>
+                                        {defsMarkup && (
+                                            <defs dangerouslySetInnerHTML={{ __html: defsMarkup }} />
+                                        )}
+                                        {elements.map((element) => (
+                                            <SvgElementRenderer
+                                                key={element.id}
+                                                element={element}
+                                                selectedIds={selectedIds}
+                                                selectedId={selectedId}
+                                                onPointerDown={handleElementPointerDown}
+                                                registerRef={(id, node) => {
+                                                    elementRefs.current[id] = node;
+                                                }}
+                                            />
+                                        ))}
+                                    </>
                                 )}
-                                {elements.map((element) => (
-                                    <SvgElementRenderer
-                                        key={element.id}
-                                        element={element}
-                                        selectedIds={selectedIds}
-                                        selectedId={selectedId}
-                                        onPointerDown={handleElementPointerDown}
-                                        registerRef={(id, node) => {
-                                            elementRefs.current[id] = node;
-                                        }}
-                                    />
-                                ))}
 
                                 {draftShape}
 

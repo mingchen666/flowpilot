@@ -136,3 +136,69 @@ export function buildSvgRootXml(svg: string): {
         dimensions: { width, height },
     };
 }
+
+/**
+ * Repair a potentially incomplete SVG string for streaming rendering.
+ * It removes incomplete tags at the end and ensures the root <svg> is closed.
+ */
+export function repairSvg(svg: string): string {
+    if (!svg) return "";
+    let fixed = svg;
+
+    // 1. If it doesn't contain <svg tag at all yet, return as is (likely too early)
+    if (!/<svg[\s>]/i.test(fixed)) {
+        return fixed;
+    }
+
+    // 2. If it already ends with </svg>, assume it's complete (or close enough)
+    if (/<\/svg>\s*$/i.test(fixed)) {
+        return fixed;
+    }
+
+    // 3. Intelligent repair for incomplete tags
+    // Instead of just chopping off the last '<', we try to close it properly
+    
+    // Check if we are inside a tag definition (e.g., <rect x="10" y=...)
+    const lastOpen = fixed.lastIndexOf('<');
+    const lastClose = fixed.lastIndexOf('>');
+    
+    if (lastOpen > lastClose) {
+        // We have an unclosed tag like "... <rect x='10"
+        const unclosedTag = fixed.substring(lastOpen);
+        
+        // Check if we are inside an attribute value (odd number of quotes)
+        const doubleQuotes = (unclosedTag.match(/"/g) || []).length;
+        const singleQuotes = (unclosedTag.match(/'/g) || []).length;
+        
+        let needsQuote = false;
+        if (doubleQuotes % 2 !== 0) {
+            fixed += '"';
+            needsQuote = true;
+        } else if (singleQuotes % 2 !== 0) {
+            fixed += "'";
+            needsQuote = true;
+        }
+        
+        // If we just closed a quote, or if we weren't in a quote but in a tag...
+        // We should try to close the tag.
+        // If the last char is already '/', just add '>'
+        if (fixed.trim().endsWith('/')) {
+             fixed += ">";
+        } else {
+             // Simple heuristic: just add " />" to self-close it safely.
+             fixed += " />";
+        }
+    } else {
+        // We are likely in text content or between tags.
+        // Check if we are inside a text node that needs closing? 
+        // Hard to tell without a parser.
+        // But if we are simply "between tags", we can just append </svg>.
+    }
+
+    // 4. Close the SVG root
+    if (!/<\/svg>\s*$/i.test(fixed)) {
+        fixed += "</svg>";
+    }
+    
+    return fixed;
+}

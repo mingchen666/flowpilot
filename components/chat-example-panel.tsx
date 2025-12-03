@@ -62,7 +62,7 @@ export default function ExamplePanel({
 
     return (
         <div className="flex w-full justify-center px-1 py-2">
-            <div className="w-full max-w-[min(720px,90%)] space-y-4">
+            <div className="w-full max-w-[min(520px,80%)] space-y-4">
                 <div className="rounded-3xl border border-slate-100 bg-gradient-to-br from-white via-slate-50 to-slate-100 p-5 shadow-sm">
                     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                         <div className="space-y-2">

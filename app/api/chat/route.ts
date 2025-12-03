@@ -89,7 +89,7 @@ Rules:
 - Keep text on short lines and aligned to the grid; abbreviate gently if needed without dropping key meaning.
 - Aim for premium polish: balanced whitespace, crisp typography, clean gradients or subtle shadows, and high text contrast.
 - If the user references existing XML/shapes, reinterpret visually but respond with SVG only.
-- Call display_svg exactly once with the final SVG—no streaming or partial fragments.`;
+- Call display_svg exactly once with the final SVG. Streaming the content is supported for real-time feedback.`;
 
     const systemMessage =
       outputMode === "svg" ? svgSystemMessage : drawioSystemMessage;
@@ -242,7 +242,7 @@ Render mode: ${outputMode === "svg" ? "svg-only" : "drawio-xml"}`;
       tools: outputMode === "svg"
         ? {
           display_svg: {
-            description: `Return one complete SVG (no partial streaming) to render on draw.io. SVG must be self-contained, include width/height or viewBox sized around 800x600, and avoid external assets, scripts, or event handlers.`,
+            description: `Return the SVG code. Streaming is supported for real-time rendering. SVG must be self-contained, include width/height or viewBox sized around 800x600, and avoid external assets, scripts, or event handlers.`,
             inputSchema: z.object({
               svg: z.string().describe("Standalone SVG markup sized for a single viewport; no external assets, scripts, or event handlers."),
             }),

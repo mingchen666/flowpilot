@@ -105,13 +105,31 @@ export function replaceNodes(currentXML: string, nodes: string): string {
   if (!currentXML || currentXML.trim().length === 0) {
     return `<mxGraphModel>${normalizedRoot}</mxGraphModel>`;
   }
-  const rootPattern = /<root[\s\S]*?<\/root>/i;
-  if (rootPattern.test(currentXML)) {
-    return currentXML.replace(rootPattern, normalizedRoot);
+
+  const rootStartIndex = currentXML.indexOf("<root");
+  const rootEndIndex = currentXML.indexOf("</root>");
+
+  if (rootStartIndex !== -1 && rootEndIndex !== -1 && rootEndIndex > rootStartIndex) {
+    // Found existing <root>...</root> structure, replace it directly.
+    // This is the most common and efficient case for updates.
+    return (
+      currentXML.substring(0, rootStartIndex) +
+      normalizedRoot +
+      currentXML.substring(rootEndIndex + "</root>".length)
+    );
   }
-  if (currentXML.includes("<mxGraphModel")) {
-    return currentXML.replace("</mxGraphModel>", `${normalizedRoot}</mxGraphModel>`);
+
+  // If <root>...</root> not found, but <mxGraphModel> exists, insert <root> before </mxGraphModel>.
+  const mxGraphModelEndIndex = currentXML.indexOf("</mxGraphModel>");
+  if (mxGraphModelEndIndex !== -1) {
+    return (
+      currentXML.substring(0, mxGraphModelEndIndex) +
+      normalizedRoot +
+      "</mxGraphModel>"
+    );
   }
+
+  // Fallback: If no mxGraphModel structure found, create a new one.
   return `<mxGraphModel>${normalizedRoot}</mxGraphModel>`;
 }
 

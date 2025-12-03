@@ -63,7 +63,7 @@ export function DiagramProvider({ children }: { children: React.ReactNode }) {
                 });
             }
             loadDiagramTimeoutRef.current = null;
-        }, 150); // 150ms 防抖，平衡流畅度和性能
+        }, 1000); // 1s 防抖，减少卡顿
     }, []);
 
     const handleDiagramExport = (data: any) => {

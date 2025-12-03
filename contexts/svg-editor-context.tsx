@@ -92,6 +92,19 @@ export type TextElement = SvgElementBase & {
     fontFamily?: string;
     textAnchor?: "start" | "middle" | "end";
     dominantBaseline?: "auto" | "middle" | "hanging" | "central" | "text-before-edge" | "text-after-edge" | "ideographic" | "alphabetic" | "mathematical";
+    tspans?: Array<{
+        text: string;
+        x?: number;
+        y?: number;
+        dx?: number;
+        dy?: number;
+        fontSize?: number;
+        fontWeight?: string;
+        fontFamily?: string;
+        fontStyle?: string;
+        textDecoration?: string;
+        fill?: string;
+    }>;
 };
 
 export type ImageElement = SvgElementBase & {
@@ -116,6 +129,11 @@ export type UseElement = SvgElementBase & {
 export type GroupElement = SvgElementBase & {
     type: "g";
     children: SvgElement[];
+    fontSize?: number;
+    fontWeight?: string;
+    fontFamily?: string;
+    textAnchor?: "start" | "middle" | "end";
+    dominantBaseline?: "auto" | "middle" | "hanging" | "central" | "text-before-edge" | "text-after-edge" | "ideographic" | "alphabetic" | "mathematical";
 };
 
 export type SvgElement =
@@ -182,7 +200,7 @@ type SvgEditorContextValue = {
     duplicateElement: (id: string) => string | null;
     duplicateMany: (ids: Iterable<string>) => string[];
     removeMany: (ids: Iterable<string>) => void;
-    loadSvgMarkup: (svg: string, options?: { saveHistory?: boolean; recordMeta?: { name?: string; type?: "paste" | "upload" } }) => void;
+    loadSvgMarkup: (svg: string, options?: { saveHistory?: boolean; skipSnapshot?: boolean; skipOptimization?: boolean; recordMeta?: { name?: string; type?: "paste" | "upload" } }) => void;
     exportSvgMarkup: () => string;
     clearSvg: () => void;
     history: HistoryEntry[];
@@ -197,6 +215,8 @@ type SvgEditorContextValue = {
     resolveUseReference: (href: string) => SvgElement | null;
     importHistory: ImportRecord[];
     addImportRecord: (record: Omit<ImportRecord, "id">) => void;
+    streamingSvgContent: string | null;
+    setStreamingSvgContent: (content: string | null) => void;
 };
 
 const DEFAULT_DOC: SvgDocument = {
@@ -658,8 +678,8 @@ function removeDuplicateAttributes(svg: string): string {
     });
 }
 
-function parseSvgMarkup(svg: string): { doc: SvgDocument; elements: SvgElement[]; defs?: string | null; valid: boolean } {
-    console.log("Parsing SVG...", svg.slice(0, 200));
+function parseSvgMarkup(svg: string, skipOptimization = false): { doc: SvgDocument; elements: SvgElement[]; defs?: string | null; valid: boolean } {
+    // console.log("Parsing SVG...", svg.slice(0, 200));
     let normalized = decodeSvgContent(svg);
 
     // 简单的预处理：转义未转义的 & 符号，防止 DOMParser 解析失败导致截断
@@ -667,7 +687,10 @@ function parseSvgMarkup(svg: string): { doc: SvgDocument; elements: SvgElement[]
     normalized = normalized.replace(/&(?![a-zA-Z0-9#]+;)/g, "&amp;");
 
     // 移除重复属性 (修复 Attribute redefined 错误)
-    normalized = removeDuplicateAttributes(normalized);
+    // 在流式渲染等高性能场景下可以跳过此步骤
+    if (!skipOptimization) {
+        normalized = removeDuplicateAttributes(normalized);
+    }
 
     const parser = new DOMParser();
     const parsed = parser.parseFromString(normalized, "image/svg+xml");
@@ -769,6 +792,7 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
     const [defsMarkup, setDefsMarkup] = useState<string | null>(null);
     const [symbolLibrary, setSymbolLibrary] = useState<Map<string, SvgElement>>(new Map());
     const [importHistory, setImportHistory] = useState<ImportRecord[]>([]);
+    const [streamingSvgContent, setStreamingSvgContent] = useState<string | null>(null);
 
     const takeSnapshot = useCallback(
         (
@@ -1176,14 +1200,14 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const loadSvgMarkup = useCallback(
-        (svg: string, options?: { saveHistory?: boolean; recordMeta?: { name?: string; type?: "paste" | "upload" } }) => {
+        (svg: string, options?: { saveHistory?: boolean; skipSnapshot?: boolean; skipOptimization?: boolean; recordMeta?: { name?: string; type?: "paste" | "upload" } }) => {
             try {
                 const content = svg.trim();
                 if (!content.toLowerCase().includes("<svg")) {
                     console.warn("忽略非 SVG 内容载入：", content.slice(0, 120));
                     return;
                 }
-                const parsed = parseSvgMarkup(svg);
+                const parsed = parseSvgMarkup(svg, options?.skipOptimization);
                 if (!parsed.valid) {
                     return;
                 }
@@ -1191,7 +1215,9 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
                 setElements(parsed.elements);
                 setDefsMarkup(parsed.defs ?? null);
                 setSelectedId(null);
-                pushHistorySnapshot(parsed.elements, parsed.doc, parsed.defs ?? null);
+                if (options?.skipSnapshot !== true) {
+                    pushHistorySnapshot(parsed.elements, parsed.doc, parsed.defs ?? null);
+                }
                 if (options?.saveHistory !== false) {
                     const snapshot = buildSvgMarkup(parsed.doc, parsed.elements);
                     addHistory(snapshot);
@@ -1320,6 +1346,8 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
             resolveUseReference,
             importHistory,
             addImportRecord,
+            streamingSvgContent,
+            setStreamingSvgContent,
         }),
         [
             doc,
@@ -1350,6 +1378,7 @@ export function SvgEditorProvider({ children }: { children: React.ReactNode }) {
             resolveUseReference,
             importHistory,
             addImportRecord,
+            streamingSvgContent,
         ]
     );
 

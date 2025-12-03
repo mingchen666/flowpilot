@@ -37,8 +37,8 @@ import { ChatMessageDisplay } from "./chat-message-display-optimized";
 import { useDiagram } from "@/contexts/diagram-context";
 import { useConversationManager } from "@/contexts/conversation-context";
 import { useSvgEditor } from "@/contexts/svg-editor-context";
-import { cn, formatXML, replaceXMLParts } from "@/lib/utils";
-import { buildSvgRootXml } from "@/lib/svg";
+import { cn, formatXML, replaceXMLParts, convertToLegalXml } from "@/lib/utils";
+import { buildSvgRootXml, repairSvg } from "@/lib/svg";
 import { SessionStatus } from "@/components/session-status";
 import { QuickActionBar } from "@/components/quick-action-bar";
 import type { QuickActionDefinition } from "@/components/quick-action-bar";
@@ -108,6 +108,7 @@ export default function ChatPanelOptimized({
         clearSvg,
         history: svgHistory,
         restoreHistoryAt: restoreSvgHistoryAt,
+        setStreamingSvgContent,
     } = useSvgEditor();
     const [internalRenderMode, setInternalRenderMode] = useState<DiagramRenderingMode>("drawio");
     const renderMode = controlledRenderMode ?? internalRenderMode;
@@ -152,24 +153,26 @@ export default function ChatPanelOptimized({
     const handleCanvasUpdate = useCallback(
         async (payload: string, meta: DiagramUpdateMeta) => {
             if (isSvgMode) {
+                setStreamingSvgContent(null);
                 loadSvgMarkup(payload);
                 updateActiveBranchDiagram(payload);
                 return;
             }
             await handleDiagramXml(payload, meta);
         },
-        [isSvgMode, loadSvgMarkup, updateActiveBranchDiagram, handleDiagramXml]
+        [isSvgMode, loadSvgMarkup, updateActiveBranchDiagram, handleDiagramXml, setStreamingSvgContent]
     );
     const tryApplyCanvasRoot = useCallback(
         async (xml: string) => {
             if (isSvgMode) {
+                setStreamingSvgContent(null);
                 loadSvgMarkup(xml);
                 updateActiveBranchDiagram(xml);
                 return;
             }
             await tryApplyRoot(xml);
         },
-        [isSvgMode, loadSvgMarkup, updateActiveBranchDiagram, tryApplyRoot]
+        [isSvgMode, loadSvgMarkup, updateActiveBranchDiagram, tryApplyRoot, setStreamingSvgContent]
     );
     const getLatestCanvasMarkup = useCallback(
         () => (isSvgMode ? exportSvgMarkup() : getLatestDiagramXml()),
@@ -450,15 +453,17 @@ export default function ChatPanelOptimized({
                         }
 
                         // 立即渲染到画布
-                        await handleCanvasUpdate(finalXml, {
+                        // 最终完成时，我们进行一次 convertToLegalXml 清洗，确保数据合规
+                        const cleanXml = convertToLegalXml(finalXml);
+                        await handleCanvasUpdate(cleanXml, {
                             origin: "display",
                             modelRuntime: selectedModel ?? undefined,
                         });
 
                         // 同时保存到 diagramResultsRef 供后续使用
-                        console.log("Saving diagram to gallery:", toolCall.toolCallId, finalXml.slice(0, 50));
+                        console.log("Saving diagram to gallery:", toolCall.toolCallId, cleanXml.slice(0, 50));
                         diagramResultsRef.current.set(toolCall.toolCallId, {
-                            xml: finalXml,
+                            xml: cleanXml,
                             mode: isSvgContent ? "drawio" : "drawio", // 仍然是 drawio 模式，因为是在 drawio 画布上渲染
                             runtime: selectedModel ?? undefined,
                             // 如果是 SVG 内容，我们也保存原始 SVG 以备不时之需（虽然 gallery 主要用 xml/svg 快照）
@@ -517,11 +522,13 @@ export default function ChatPanelOptimized({
                         }
 
                         if (isSvgMode) {
-                            loadSvgMarkup(svg);
-                            updateActiveBranchDiagram(svg);
+                            const fixed = repairSvg(svg);
+                            setStreamingSvgContent(null); // Clear streaming preview
+                            loadSvgMarkup(fixed);
+                            updateActiveBranchDiagram(fixed);
                             diagramResultsRef.current.set(toolCall.toolCallId, {
-                                xml: svg,
-                                svg,
+                                xml: fixed,
+                                svg: fixed,
                                 mode: "svg",
                                 runtime: selectedModel ?? undefined,
                             });
@@ -724,7 +731,7 @@ export default function ChatPanelOptimized({
 
             // 重新发送最后一条用户消息
             const chartXml = await onFetchChart();
-            const streamingFlag = renderMode === "svg" ? false : selectedModel?.isStreaming ?? false;
+            const streamingFlag = selectedModel?.isStreaming ?? false;
 
             sendMessage(
                 { parts: lastUserMessage.parts || [] },
@@ -831,7 +838,7 @@ export default function ChatPanelOptimized({
             }
             try {
                 let chartXml = await onFetchChart();
-                const streamingFlag = renderMode === "svg" ? false : selectedModel?.isStreaming ?? false;
+                const streamingFlag = selectedModel?.isStreaming ?? false;
 
                 const enrichedInput =
                     briefContext.prompt.length > 0
@@ -1409,12 +1416,27 @@ export default function ChatPanelOptimized({
                                     setInput={setInput}
                                     setFiles={handleFileChange}
                                     activeBranchId={activeBranchId}
-                                    onDisplayDiagram={(xml) =>
+                                    onDisplayDiagram={(xml, { isFinal } = {}) => {
+                                        if (isSvgMode) {
+                                            const fixed = repairSvg(xml);
+                                            
+                                            // 如果是流式更新，使用轻量级的预览层
+                                            if (isFinal === false) {
+                                                setStreamingSvgContent(fixed);
+                                                return;
+                                            }
+
+                                            // 只有在最终完成时，才清除预览层并加载到编辑器状态
+                                            setStreamingSvgContent(null);
+                                            loadSvgMarkup(fixed, { skipSnapshot: true, saveHistory: false, skipOptimization: true });
+                                            updateActiveBranchDiagram(fixed);
+                                            return;
+                                        }
                                         handleDiagramXml(xml, {
                                             origin: "display",
                                             modelRuntime: selectedModel ?? undefined,
-                                        })
-                                    }
+                                        });
+                                    }}
                                     onComparisonApply={(result) => {
                                         void handleApplyComparisonResult(result);
                                     }}

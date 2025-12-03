@@ -64,7 +64,7 @@ type Option<T extends string> = {
     prompt: string;
 };
 
-const BRIEF_MODE_OPTIONS: {
+export const BRIEF_MODE_OPTIONS: {
     id: BriefModeId;
     title: string;
     description: string;

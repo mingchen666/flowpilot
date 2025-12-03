@@ -14,6 +14,7 @@ import {
 } from "@/types/comparison";
 import { TokenUsageDisplay } from "./token-usage-display";
 import type { DiagramResultEntry } from "@/features/chat-panel/types";
+import { MessageItem } from "./message-item";
 
 const LARGE_TOOL_INPUT_CHAR_THRESHOLD = 3000;
 const CHAR_COUNT_FORMATTER = new Intl.NumberFormat("zh-CN");
@@ -27,7 +28,7 @@ interface ChatMessageDisplayProps {
     setFiles: (files: File[]) => void;
     onDisplayDiagram?: (
         xml: string,
-        meta: { toolCallId?: string }
+        meta: { toolCallId?: string; isFinal?: boolean }
     ) => void | Promise<void>;
     onComparisonApply?: (result: ComparisonCardResult) => void;
     onComparisonCopyXml?: (xml: string) => void;
@@ -75,7 +76,7 @@ const DiagramToolCard = memo(({
     isGenerationBusy?: boolean;
     isComparisonRunning?: boolean;
     diagramResult?: DiagramResultEntry;
-    onStreamingApply?: (xml: string, callId: string) => void;
+    onStreamingApply?: (xml: string, callId: string, mode: "drawio" | "svg") => void;
     onRetry?: () => void;
     messageMetadata?: {
         usage?: {
@@ -151,20 +152,29 @@ const DiagramToolCard = memo(({
             // 流已结束，但工具调用状态仍为 streaming，自动标记为完成
             setLocalState("output-available");
             setAutoCompletedByStreamEnd(true);
+            // 确保最后一次更新被应用
+            if (onStreamingApply) {
+                onStreamingApply(displayDiagramXml, callId, diagramMode);
+            }
         }
-    }, [isGenerationBusy, isComparisonRunning, localState, displayDiagramXml]);
+    }, [isGenerationBusy, isComparisonRunning, localState, displayDiagramXml, onStreamingApply, callId, diagramMode]);
 
     // 流式渲染：在streaming状态下实时应用图表
+    const lastStreamingUpdateRef = useRef<number>(0);
     useEffect(() => {
         if (
-            diagramMode !== "svg" &&
             localState === "input-streaming" &&
             displayDiagramXml &&
             displayDiagramXml !== previousXmlRef.current &&
             onStreamingApply
         ) {
-            previousXmlRef.current = displayDiagramXml;
-            onStreamingApply(displayDiagramXml, callId);
+            const now = Date.now();
+            // Increase throttle to 800ms to prevent browser freeze during heavy rendering
+            if (now - lastStreamingUpdateRef.current > 800) {
+                previousXmlRef.current = displayDiagramXml;
+                lastStreamingUpdateRef.current = now;
+                onStreamingApply(displayDiagramXml, callId, diagramMode);
+            }
         }
     }, [diagramMode, localState, displayDiagramXml, callId, onStreamingApply]);
 
@@ -259,7 +269,7 @@ const DiagramToolCard = memo(({
 
     return (
         <div
-            className="my-2 w-full max-w-[min(720px,90%)] rounded-lg bg-white/80 border border-slate-200/60 px-4 py-3 text-xs text-slate-600"
+            className="my-2 w-full max-w-[min(520px,80%)] rounded-lg bg-white/80 border border-slate-200/60 px-4 py-3 text-xs text-slate-600"
         >
             <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
@@ -410,7 +420,7 @@ export function ChatMessageDisplay({
     briefSummary,
     runtimeDiagramError,
     onConsumeRuntimeError,
-    onStopAll,
+    onStopAll: onStopAllProp, // Renamed to avoid potential conflict
     onRetryGeneration,
     isGenerationBusy = false,
     isComparisonRunning = false,
@@ -425,15 +435,18 @@ export function ChatMessageDisplay({
     const generationStartTimeRef = useRef<number | null>(null);
 
     // 流式渲染回调
-    const handleStreamingApply = useCallback((xml: string, toolCallId: string) => {
+    const handleStreamingApply = useCallback((xml: string, toolCallId: string, mode: "drawio" | "svg" = "drawio") => {
         if (!xml || typeof onDisplayDiagram !== "function") {
             return;
         }
-        // 流式渲染时需要先转换为合法的XML（处理不完整的标签）
-        const convertedXml = convertToLegalXml(xml);
+        
+        // 在流式传输期间，绝对不要调用 expensive 的 convertToLegalXml
+        // 该函数的正则在处理未闭合标签时会导致严重的性能回溯，造成浏览器卡死
+        // Draw.io 引擎本身对不完整的 XML 有一定的容错能力
+        const finalXml = xml;
 
         // 在streaming状态下直接应用，不使用async/await避免阻塞
-        const result = onDisplayDiagram(convertedXml, { toolCallId });
+        const result = onDisplayDiagram(finalXml, { toolCallId, isFinal: false });
         if (result && typeof result.catch === 'function') {
             result.catch((error) => {
                 console.error("流式渲染失败:", error);
@@ -598,7 +611,7 @@ export function ChatMessageDisplay({
                     key={callId}
                     part={part}
                     onCopy={handleCopyDiagramXml}
-                    onStopAll={onStopAll}
+                    onStopAll={onStopAllProp}
                     isGenerationBusy={isGenerationBusy}
                     isComparisonRunning={isComparisonRunning}
                     diagramResult={diagramResult}
@@ -678,7 +691,7 @@ export function ChatMessageDisplay({
         return (
             <div
                 key={callId}
-                className="my-2 w-full max-w-[min(720px,90%)] rounded-lg  bg-white/95 px-3 py-2.5 text-xs leading-relaxed text-slate-600"
+                className="my-2 w-full max-w-[min(520px,80%)] rounded-lg  bg-white/95 px-3 py-2.5 text-xs leading-relaxed text-slate-600"
             >
                 <div className="flex flex-col gap-1.5">
                     <div className="flex items-center justify-between">
@@ -733,7 +746,7 @@ export function ChatMessageDisplay({
         );
     };
 
-    const renderComparisonEntry = (
+    const renderComparisonEntry = useCallback((
         entry: ComparisonHistoryEntry,
         keyBase: string
     ) => {
@@ -751,7 +764,7 @@ export function ChatMessageDisplay({
         const hasMultipleOptions = successfulResults.length > 1;
         const showSwitcher = !isWaitingForSelection && hasMultipleOptions && currentResultIndex >= 0;
         const canStopComparison =
-            isEntryLoading && typeof onStopAll === "function";
+            isEntryLoading && typeof onStopAllProp === "function";
 
         return (
             <div key={`${keyBase}-comparison`} className="mt-2 w-full">
@@ -816,7 +829,7 @@ export function ChatMessageDisplay({
                             {canStopComparison && (
                                 <button
                                     type="button"
-                                    onClick={onStopAll}
+                                    onClick={onStopAllProp}
                                     className="inline-flex items-center rounded-full border border-slate-200 px-2.5 py-1 text-[10px] font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-800"
                                 >
                                     暂停生成
@@ -1139,9 +1152,9 @@ export function ChatMessageDisplay({
                 </div>
             </div>
         );
-    };
+    }, [activeBranchId, activePreview, buildComparisonPreviewUrl, onComparisonApply, onComparisonPreview, onComparisonRetry, onStopAllProp]);
 
-    const resolveMessageText = (message: UIMessage): string => {
+    const resolveMessageText = useCallback((message: UIMessage): string => {
         if (typeof (message as any).content === "string") {
             return (message as any).content;
         }
@@ -1162,9 +1175,9 @@ export function ChatMessageDisplay({
                 .trim();
         }
         return "";
-    };
+    }, []);
 
-    const handleCopyMessage = async (messageId: string, text: string) => {
+    const handleCopyMessage = useCallback(async (messageId: string, text: string) => {
         try {
             await navigator.clipboard.writeText(text);
             setCopiedMessageId(messageId);
@@ -1172,14 +1185,14 @@ export function ChatMessageDisplay({
         } catch (err) {
             console.error('Failed to copy:', err);
         }
-    };
+    }, []);
 
-    const toggleMessageExpanded = (messageId: string) => {
+    const toggleMessageExpanded = useCallback((messageId: string) => {
         setExpandedMessages(prev => ({
             ...prev,
             [messageId]: !prev[messageId]
         }));
-    };
+    }, []);
 
     const leadingComparisons = useMemo(
         () => comparisonHistory.filter((entry) => !entry.anchorMessageId),
@@ -1197,266 +1210,203 @@ export function ChatMessageDisplay({
         return map;
     }, [comparisonHistory]);
 
-    const renderedAnchors = new Set<string>();
-    const showExamplePanel = (
-        messages.length === 0 &&
-        leadingComparisons.length === 0 &&
-        comparisonHistory.length === 0
-    );
+        const renderedAnchors = useRef(new Set<string>());
 
-    return (
-        <div className="pr-4">
-            {showExamplePanel ? (
-                <div className="py-2">
-                    <ExamplePanel
-                        setInput={setInput}
-                        setFiles={setFiles}
-                        onOpenBriefPanel={onOpenBriefPanel}
-                        briefBadges={briefBadges}
-                        briefSummary={briefSummary}
-                    />
-                </div>
-            ) : (
-                <>
-                    {leadingComparisons.map((entry, index) => (
-                        <div
-                            key={`comparison-leading-${index}`}
-                            className="mb-5 text-left"
-                        >
-                            {renderComparisonEntry(entry, `comparison-leading-${index}`)}
-                        </div>
-                    ))}
-                    {messages.map((message) => {
-                        const isUser = message.role === "user";
-                        const parts = Array.isArray(message.parts) ? message.parts : [];
-                        const toolParts = parts.filter((part: any) =>
-                            part.type?.startsWith("tool-")
-                        );
-                        const contentParts = parts.filter(
-                            (part: any) => !part.type?.startsWith("tool-")
-                        );
-                        const displayableContentParts = contentParts.filter((part: any) => {
-                            if (part.type === "text") {
-                                const textToShow = (part.displayText ?? part.text ?? "").trim();
-                                return textToShow.length > 0;
-                            }
-                            return true;
-                        });
-                        const fallbackText =
-                            contentParts.length === 0 ? resolveMessageText(message) : "";
-                        const hasBubbleContent =
-                            displayableContentParts.length > 0 || fallbackText.length > 0;
-                        const anchoredEntries =
-                            anchoredComparisons.get(message.id) ?? [];
-                        if (anchoredEntries.length > 0) {
-                            renderedAnchors.add(message.id);
-                        }
+        // Reset renderedAnchors on each render
 
-                        const fullMessageText = resolveMessageText(message);
-                        const messageLength = fullMessageText.length;
-                        const shouldCollapse = messageLength > 500;
-                        const isExpanded = expandedMessages[message.id] ?? !shouldCollapse;
-                        const isCopied = copiedMessageId === message.id;
+        renderedAnchors.current.clear();
 
-                        return (
-                            <div key={message.id} className="mb-5 flex flex-col gap-2">
-                                {hasBubbleContent && (
-                                    <div
-                                        className={cn(
-                                            "flex w-full",
-                                            isUser ? "justify-end" : "justify-start"
-                                        )}
-                                    >
-                                        <div className="relative max-w-[min(720px,90%)] group">
-                                            <div
-                                                className={cn(
-                                                    "rounded-lg px-3.5 py-2.5 text-sm leading-relaxed",
-                                                    "whitespace-pre-wrap break-words",
-                                                    isUser
-                                                        ? "bg-slate-900 text-white"
-                                                        : "border border-slate-200/60 bg-white text-slate-900",
-                                                    !isExpanded && "max-h-[200px] overflow-hidden relative"
-                                                )}
-                                            >
-                                                {displayableContentParts.map((part: any, index: number) => {
-                                                    switch (part.type) {
-                                                        case "text":
-                                                            const textToShow =
-                                                                part.displayText ?? part.text ?? "";
-                                                            return (
-                                                                <div key={index} className="mb-1 last:mb-0">
-                                                                    {textToShow}
-                                                                </div>
-                                                            );
-                                                        case "file":
-                                                            return (
-                                                                <div key={index} className="mt-3">
-                                                                    <Image
-                                                                        src={part.url}
-                                                                        width={240}
-                                                                        height={240}
-                                                                        alt={`file-${index}`}
-                                                                        className="rounded-xl border object-contain"
-                                                                    />
-                                                                </div>
-                                                            );
-                                                        default:
-                                                            return null;
-                                                    }
-                                                })}
-                                                {!contentParts.length && fallbackText && (
-                                                    <div>{fallbackText}</div>
-                                                )}
-                                                {!isExpanded && (
-                                                    <div
-                                                        className={cn(
-                                                            "absolute bottom-0 left-0 right-0 h-20 pointer-events-none",
-                                                            isUser
-                                                                ? "bg-gradient-to-t from-slate-900 to-transparent"
-                                                                : "bg-gradient-to-t from-white to-transparent"
-                                                        )}
-                                                    />
-                                                )}
-                                            </div>
+    
 
-                                            <div className={cn(
-                                                "flex items-center gap-1.5 mt-1.5",
-                                                isUser ? "justify-end" : "justify-start"
-                                            )}>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleCopyMessage(message.id, fullMessageText)}
-                                                    className={cn(
-                                                        "flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all",
-                                                        isUser
-                                                            ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                                                            : "text-slate-500 hover:text-slate-700 hover:bg-slate-100",
-                                                        isCopied && "text-emerald-600"
-                                                    )}
-                                                    title="复制消息"
-                                                >
-                                                    {isCopied ? (
-                                                        <>
-                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                            </svg>
-                                                            <span>已复制</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                                            </svg>
-                                                            <span>复制</span>
-                                                        </>
-                                                    )}
-                                                </button>
+        const showExamplePanel = (
 
-                                                {shouldCollapse && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => toggleMessageExpanded(message.id)}
-                                                        className={cn(
-                                                            "flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all",
-                                                            isUser
-                                                                ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                                                                : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
-                                                        )}
-                                                    >
-                                                        {isExpanded ? (
-                                                            <>
-                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                                                                </svg>
-                                                                <span>收起</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                                </svg>
-                                                                <span>展开</span>
-                                                            </>
-                                                        )}
-                                                    </button>
-                                                )}
-                                                {isUser && onMessageRevert && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            onMessageRevert({
-                                                                messageId: message.id,
-                                                                text: resolveMessageText(message),
-                                                            })
-                                                        }
-                                                        className={cn(
-                                                            "flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-all",
-                                                            isUser
-                                                                ? "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
-                                                                : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
-                                                        )}
-                                                        title="回滚到此处"
-                                                    >
-                                                        <svg
-                                                            className="w-3.5 h-3.5"
-                                                            fill="none"
-                                                            stroke="currentColor"
-                                                            viewBox="0 0 24 24"
-                                                        >
-                                                            <path
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
-                                                                strokeWidth={2}
-                                                                d="M15 3h4v4m-9 9l9-9m-9 0h4"
-                                                            />
-                                                        </svg>
-                                                        <span>Revert</span>
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                                {toolParts.map((part: any) => (
-                                    <div
-                                        key={part.toolCallId}
-                                        className={cn(
-                                            "flex w-full",
-                                            isUser ? "justify-end" : "justify-start"
-                                        )}
-                                    >
-                                        {renderToolPart(part, message.metadata)}
-                                    </div>
-                                ))}
-                                {anchoredEntries.length > 0 && (
-                                    <div className="mt-2 flex flex-col gap-3">
-                                        {anchoredEntries.map((entry, index) =>
-                                            renderComparisonEntry(
-                                                entry,
-                                                `comparison-anchored-${entry.requestId}-${index}`
-                                            )
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
-                    {Array.from(anchoredComparisons.entries())
-                        .filter(([anchorId]) => !renderedAnchors.has(anchorId))
-                        .flatMap(([, entries]) => entries)
-                        .map((entry, index) => (
+            messages.length === 0 &&
+
+            leadingComparisons.length === 0 &&
+
+            comparisonHistory.length === 0
+
+        );
+
+    
+
+        return (
+
+            <div className="pr-4">
+
+                {showExamplePanel ? (
+
+                    <div className="py-2">
+
+                        <ExamplePanel
+
+                            setInput={setInput}
+
+                            setFiles={setFiles}
+
+                            onOpenBriefPanel={onOpenBriefPanel}
+
+                            briefBadges={briefBadges}
+
+                            briefSummary={briefSummary}
+
+                        />
+
+                    </div>
+
+                ) : (
+
+                    <>
+
+                        {leadingComparisons.map((entry, index) => (
+
                             <div
-                                key={`comparison-orphan-${entry.requestId}-${index}`}
+
+                                key={`comparison-leading-${index}`}
+
                                 className="mb-5 text-left"
+
                             >
-                                {renderComparisonEntry(
-                                    entry,
-                                    `comparison-orphan-${entry.requestId}-${index}`
-                                )}
+
+                                {renderComparisonEntry(entry, `comparison-leading-${index}`)}
+
                             </div>
+
                         ))}
-                </>
-            )}
+
+                        {messages.map((message) => {
+
+                            const isUser = message.role === "user";
+
+                            const parts = Array.isArray(message.parts) ? message.parts : [];
+
+                            const toolParts = parts.filter((part: any) =>
+
+                                part.type?.startsWith("tool-")
+
+                            );
+
+                            const contentParts = parts.filter(
+
+                                (part: any) => !part.type?.startsWith("tool-")
+
+                            );
+
+                            const displayableContentParts = contentParts.filter((part: any) => {
+
+                                if (part.type === "text") {
+
+                                    const textToShow = (part.displayText ?? part.text ?? "").trim();
+
+                                    return textToShow.length > 0;
+
+                                }
+
+                                return true;
+
+                            });
+
+                            const fallbackText =
+
+                                contentParts.length === 0 ? resolveMessageText(message) : "";
+
+                            const hasBubbleContent =
+
+                                displayableContentParts.length > 0 || fallbackText.length > 0;
+
+                            
+
+                            const anchoredEntries = anchoredComparisons.get(message.id) ?? [];
+
+                            if (anchoredEntries.length > 0) {
+
+                                renderedAnchors.current.add(message.id);
+
+                            }
+
+    
+
+                            const fullMessageText = resolveMessageText(message);
+
+                            const isExpanded = expandedMessages[message.id] ?? !(fullMessageText.length > 500);
+
+                            const isCopied = copiedMessageId === message.id;
+
+    
+
+                            return (
+
+                                <MessageItem
+
+                                    key={message.id}
+
+                                    message={message}
+
+                                    isUser={isUser}
+
+                                    isExpanded={isExpanded}
+
+                                    isCopied={isCopied}
+
+                                    fullMessageText={fullMessageText}
+
+                                    displayableContentParts={displayableContentParts}
+
+                                    fallbackText={fallbackText}
+
+                                    hasBubbleContent={hasBubbleContent}
+
+                                    toolParts={toolParts}
+
+                                    anchoredEntries={anchoredEntries}
+
+                                    renderToolPart={renderToolPart}
+
+                                    renderComparisonEntry={renderComparisonEntry}
+
+                                    onCopyMessage={handleCopyMessage}
+
+                                    onToggleExpanded={toggleMessageExpanded}
+
+                                    onMessageRevert={onMessageRevert}
+
+                                />
+
+                            );
+
+                        })}
+
+                        {Array.from(anchoredComparisons.entries())
+
+                            .filter(([anchorId]) => !renderedAnchors.current.has(anchorId))
+
+                            .flatMap(([, entries]) => entries)
+
+                            .map((entry, index) => (
+
+                                <div
+
+                                    key={`comparison-orphan-${entry.requestId}-${index}`}
+
+                                    className="mb-5 text-left"
+
+                                >
+
+                                    {renderComparisonEntry(
+
+                                        entry,
+
+                                        `comparison-orphan-${entry.requestId}-${index}`
+
+                                    )}
+
+                                </div>
+
+                            ))}
+
+                    </>
+
+                )}
             {/* 显示生成中的 loading 提示 */}
             {isGenerationBusy && !hasLiveToolCard && (() => {
                 // 格式化耗时显示
