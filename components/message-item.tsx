@@ -75,20 +75,24 @@ export const MessageItem = memo(({
                                             </div>
                                         );
                                     case "file":
-                                        // 如果是SVG，直接渲染矢量图，否则使用Image组件
+                                        // 对于 SVG，在界面上显示为普通图片预览（避免直接渲染 SVG 太大）
+                                        // 但实际的 part.url 中仍保留完整的 SVG code 给大模型使用
                                         if (part.mediaType === "image/svg+xml" && part.url?.startsWith("data:image/svg+xml")) {
-                                            // 解码SVG内容
-                                            const svgContent = decodeURIComponent(part.url.replace(/^data:image\/svg\+xml[^,]*,/, ""));
                                             return (
-                                                <div 
-                                                    key={index} 
-                                                    className="mt-3 max-w-full overflow-auto rounded-xl border bg-slate-50 p-2 flex items-center justify-center"
-                                                    style={{ maxHeight: "240px" }}
-                                                >
-                                                    <div 
-                                                        className="max-w-full max-h-full"
-                                                        dangerouslySetInnerHTML={{ __html: svgContent }}
-                                                    />
+                                                <div key={index} className="mt-3 inline-flex">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setPreviewImage(part.url)}
+                                                        className="group relative flex items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-slate-100 transition-colors"
+                                                        style={{ width: 160, height: 120 }}
+                                                        title="点击放大预览 SVG"
+                                                    >
+                                                        <img
+                                                            src={part.url}
+                                                            alt={`svg-${index}`}
+                                                            className="max-w-full max-h-full object-contain p-2"
+                                                        />
+                                                    </button>
                                                 </div>
                                             );
                                         }
@@ -141,19 +145,29 @@ export const MessageItem = memo(({
                                 >
                                     <button
                                         type="button"
-                                        className="absolute right-2 top-2 rounded-full bg-slate-800 px-2 py-1 text-xs font-semibold text-white shadow hover:bg-slate-900"
+                                        className="absolute right-2 top-2 rounded-full bg-slate-800 px-2 py-1 text-xs font-semibold text-white shadow hover:bg-slate-900 z-10"
                                         onClick={() => setPreviewImage(null)}
                                     >
                                         关闭
                                     </button>
-                                    <div className="relative h-[70vh] w-[78vw] max-w-5xl">
-                                        <Image
-                                            src={previewImage}
-                                            alt="full-preview"
-                                            fill
-                                            sizes="90vw"
-                                            className="object-contain"
-                                        />
+                                    <div className="flex items-center justify-center" style={{ maxHeight: '80vh', maxWidth: '85vw' }}>
+                                        {previewImage.startsWith('data:image/svg+xml') ? (
+                                            <img
+                                                src={previewImage}
+                                                alt="svg-preview"
+                                                className="max-h-full max-w-full object-contain"
+                                            />
+                                        ) : (
+                                            <div className="relative h-[70vh] w-[78vw] max-w-5xl">
+                                                <Image
+                                                    src={previewImage}
+                                                    alt="full-preview"
+                                                    fill
+                                                    sizes="90vw"
+                                                    className="object-contain"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>

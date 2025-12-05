@@ -34,11 +34,13 @@ export async function POST(req: Request) {
       // 解析模型配置
       const resolvedModel = resolveChatModel(modelRuntime);
       
+      console.log("模型解析成功，准备发送测试请求");
+      
       // 发送一个简单的测试消息
-      const testMessage = "Hello! Please respond with a simple 'OK' to confirm the connection.";
+      const testMessage = "Hi";
       
       // 使用传入的maxDuration，默认30秒，最大60秒
-      const testMaxDuration = Math.min((requestMaxDuration ?? 30) * 1000, 60000);
+      const testMaxDuration = Math.min((requestMaxDuration ?? 30), 60);
       
       const startTime = Date.now();
       const result = await generateText({
@@ -49,9 +51,10 @@ export async function POST(req: Request) {
             content: testMessage,
           },
         ],
+        maxOutputTokens: 50,
         temperature: 0,
-        maxRetries: 1, // 最多重试一次
-        abortSignal: AbortSignal.timeout(testMaxDuration),
+        maxRetries: 1,
+        abortSignal: AbortSignal.timeout(testMaxDuration * 1000),
       });
 
       const endTime = Date.now();
@@ -80,11 +83,30 @@ export async function POST(req: Request) {
       });
 
     } catch (modelError: any) {
-      console.error("模型验证失败:", modelError);
+      console.error("模型验证失败:", {
+        error: modelError,
+        message: modelError.message,
+        cause: modelError.cause,
+        stack: modelError.stack?.split('\n').slice(0, 5).join('\n'),
+      });
 
       // 根据错误类型返回更具体的错误信息
       let errorMessage = "模型验证失败";
       let errorDetails = modelError.message || String(modelError);
+
+      // 检查是否有 cause 字段（AI SDK 常见错误格式）
+      if (modelError.cause) {
+        const cause = modelError.cause;
+        if (cause.message) {
+          errorDetails = cause.message;
+        }
+        if (cause.response) {
+          console.error("API 响应错误:", {
+            status: cause.response.status,
+            statusText: cause.response.statusText,
+          });
+        }
+      }
 
       if (errorDetails.includes("404") || errorDetails.includes("Not Found")) {
         errorMessage = "API 接口未找到，请检查 Base URL 配置是否正确";
@@ -98,7 +120,7 @@ export async function POST(req: Request) {
         errorMessage = "无法解析域名，请检查 Base URL 配置";
       } else if (errorDetails.includes("ECONNREFUSED")) {
         errorMessage = "连接被拒绝，请检查 Base URL 和端口配置";
-      } else if (errorDetails.includes("model") && errorDetails.includes("not found")) {
+      } else if (errorDetails.includes("model") && (errorDetails.includes("not found") || errorDetails.includes("does not exist"))) {
         errorMessage = "指定的模型 ID 不存在或不可用";
       }
 

@@ -4,7 +4,7 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState, memo } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { cn, convertToLegalXml } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { svgToDataUrl } from "@/lib/svg";
 import ExamplePanel from "./chat-example-panel";
 import { UIMessage } from "ai";
@@ -28,7 +28,7 @@ interface ChatMessageDisplayProps {
     setFiles: (files: File[]) => void;
     onDisplayDiagram?: (
         xml: string,
-        meta: { toolCallId?: string; isFinal?: boolean }
+        meta: { toolCallId?: string; isFinal?: boolean; mode?: "drawio" | "svg" }
     ) => void | Promise<void>;
     onComparisonApply?: (result: ComparisonCardResult) => void;
     onComparisonCopyXml?: (xml: string) => void;
@@ -73,7 +73,7 @@ const DiagramToolCard = memo(({
     isGenerationBusy?: boolean;
     isComparisonRunning?: boolean;
     diagramResult?: DiagramResultEntry;
-    onStreamingApply?: (xml: string, callId: string, mode: "drawio" | "svg") => void;
+    onStreamingApply?: (content: string, callId: string, mode: "drawio" | "svg") => void;
     onRetry?: () => void;
     messageMetadata?: {
         usage?: {
@@ -89,7 +89,7 @@ const DiagramToolCard = memo(({
     const toolName = (part.type?.replace("tool-", "") as string) || "display_diagram";
     const [copiedKind, setCopiedKind] = useState<"xml" | "svg" | null>(null);
     const [toolCallError, setToolCallError] = useState<string | null>(null);
-    const previousXmlRef = useRef<string>("");
+    const previousContentRef = useRef<string>("");
     const [localState, setLocalState] = useState<string>(state || "pending");
     const [autoCompletedByStreamEnd, setAutoCompletedByStreamEnd] = useState(false);
     const [showTimeoutHint, setShowTimeoutHint] = useState(false);
@@ -99,6 +99,17 @@ const DiagramToolCard = memo(({
     const displaySvg = diagramResult?.svg || (typeof input?.svg === "string" ? input.svg : null);
     const displayDiagramXml = diagramResult?.xml ||
         (typeof input?.xml === "string" ? input.xml : null);
+    const displayContent = useMemo(() => {
+        // 优先使用当前模式对应的内容，其次尝试另一种格式兜底
+        if (diagramMode === "svg") {
+            return displaySvg || displayDiagramXml;
+        }
+        return displayDiagramXml || displaySvg;
+    }, [diagramMode, displayDiagramXml, displaySvg]);
+    const hasDisplayContent = useMemo(
+        () => typeof displayContent === "string" && displayContent.trim().length > 0,
+        [displayContent]
+    );
     // 同步外部状态
     useEffect(() => {
         if (state) {
@@ -143,37 +154,36 @@ const DiagramToolCard = memo(({
             !isGenerationBusy &&
             !isComparisonRunning &&
             localState === "input-streaming" &&
-            displayDiagramXml &&
-            displayDiagramXml.length > 0
+            hasDisplayContent
         ) {
             // 流已结束，但工具调用状态仍为 streaming，自动标记为完成
             setLocalState("output-available");
             setAutoCompletedByStreamEnd(true);
             // 确保最后一次更新被应用
             if (onStreamingApply) {
-                onStreamingApply(displayDiagramXml, callId, diagramMode);
+                onStreamingApply(displayContent!, callId, diagramMode);
             }
         }
-    }, [isGenerationBusy, isComparisonRunning, localState, displayDiagramXml, onStreamingApply, callId, diagramMode]);
+    }, [isGenerationBusy, isComparisonRunning, localState, hasDisplayContent, displayContent, onStreamingApply, callId, diagramMode]);
 
     // 流式渲染：在streaming状态下实时应用图表
     const lastStreamingUpdateRef = useRef<number>(0);
     useEffect(() => {
         if (
             localState === "input-streaming" &&
-            displayDiagramXml &&
-            displayDiagramXml !== previousXmlRef.current &&
+            hasDisplayContent &&
+            displayContent !== previousContentRef.current &&
             onStreamingApply
         ) {
             const now = Date.now();
             // Increase throttle to 800ms to prevent browser freeze during heavy rendering
             if (now - lastStreamingUpdateRef.current > 800) {
-                previousXmlRef.current = displayDiagramXml;
+                previousContentRef.current = displayContent!;
                 lastStreamingUpdateRef.current = now;
-                onStreamingApply(displayDiagramXml, callId, diagramMode);
+                onStreamingApply(displayContent!, callId, diagramMode);
             }
         }
-    }, [diagramMode, localState, displayDiagramXml, callId, onStreamingApply]);
+    }, [diagramMode, localState, hasDisplayContent, displayContent, callId, onStreamingApply]);
 
     const handleCopyClick = useCallback(async () => {
         if (!displayDiagramXml) return;
@@ -208,12 +218,12 @@ const DiagramToolCard = memo(({
     }, [onRetry]);
 
     const handleManualComplete = useCallback(() => {
-        if (displayDiagramXml && displayDiagramXml.length > 0) {
+        if (hasDisplayContent) {
             setLocalState("output-available");
             setAutoCompletedByStreamEnd(true);
             setShowTimeoutHint(false);
         }
-    }, [displayDiagramXml]);
+    }, [hasDisplayContent]);
 
     const currentState = localState || state;
 
@@ -359,7 +369,7 @@ const DiagramToolCard = memo(({
                     </button>
                 )}
                 {/* 超时手动完成按钮 */}
-                {showTimeoutHint && currentState === "input-streaming" && displayDiagramXml && (
+                {showTimeoutHint && currentState === "input-streaming" && hasDisplayContent && (
                     <button
                         type="button"
                         onClick={handleManualComplete}
@@ -417,18 +427,18 @@ export function ChatMessageDisplay({
     const generationStartTimeRef = useRef<number | null>(null);
 
     // 流式渲染回调
-    const handleStreamingApply = useCallback((xml: string, toolCallId: string, mode: "drawio" | "svg" = "drawio") => {
-        if (!xml || typeof onDisplayDiagram !== "function") {
+    const handleStreamingApply = useCallback((content: string, toolCallId: string, mode: "drawio" | "svg" = "drawio") => {
+        if (!content || typeof onDisplayDiagram !== "function") {
             return;
         }
         
         // 在流式传输期间，绝对不要调用 expensive 的 convertToLegalXml
         // 该函数的正则在处理未闭合标签时会导致严重的性能回溯，造成浏览器卡死
-        // Draw.io 引擎本身对不完整的 XML 有一定的容错能力
-        const finalXml = xml;
+        // Draw.io 引擎本身对不完整的 XML 有一定的容错能力；SVG 预览也需要最大限度原样透传
+        const finalContent = content;
 
         // 在streaming状态下直接应用，不使用async/await避免阻塞
-        const result = onDisplayDiagram(finalXml, { toolCallId, isFinal: false });
+        const result = onDisplayDiagram(finalContent, { toolCallId, isFinal: false, mode });
         if (result && typeof result.catch === 'function') {
             result.catch((error) => {
                 console.error("流式渲染失败:", error);
@@ -1257,12 +1267,20 @@ export function ChatMessageDisplay({
                                 if (part.type === "text") {
 
                                     const rawText = part.text ?? "";
-                                    const codeBlockMatch = rawText.match(/```svg\\n([\\s\\S]*?)```/i);
-                                    const inlineMatch = rawText.includes("<svg")
-                                        ? rawText
-                                        : null;
-                                    const svgPayload = codeBlockMatch?.[1] || inlineMatch;
-                                    const dataUrl = svgPayload ? svgToDataUrl(svgPayload) : null;
+                                    // 尝试匹配 markdown 代码块中的 SVG（支持多种换行符）
+                                    const codeBlockMatch = rawText.match(/```svg\s*\n([\s\S]*?)```/i);
+                                    // 如果代码块匹配失败，且文本中包含 <svg 标签，尝试直接提取 SVG 内容
+                                    let svgPayload = codeBlockMatch?.[1];
+                                    
+                                    if (!svgPayload && rawText.includes("<svg")) {
+                                        // 尝试提取从 <svg 到 </svg> 的内容
+                                        const svgMatch = rawText.match(/(<svg[\s\S]*?<\/svg>)/i);
+                                        if (svgMatch) {
+                                            svgPayload = svgMatch[1];
+                                        }
+                                    }
+                                    
+                                    const dataUrl = svgPayload ? svgToDataUrl(svgPayload.trim()) : null;
                                     const base = {
                                         ...part,
                                         displayText:

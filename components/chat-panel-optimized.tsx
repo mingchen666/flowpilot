@@ -188,6 +188,77 @@ export default function ChatPanelOptimized({
     );
 
     const lastBranchIdRef = useRef(activeBranchId);
+    const streamingSvgFrameRef = useRef<number | null>(null);
+    const latestStreamingSvgRef = useRef<string | null>(null);
+    const lastPreviewLengthRef = useRef<number>(0);
+    const lastPreviewAtRef = useRef<number>(0);
+    const idleCallbackIdRef = useRef<number | null>(null);
+
+    const normalizeStreamingSvg = useCallback((raw: string): string | null => {
+        if (!raw || !raw.includes("<svg")) return null;
+        let fixed = raw;
+        // 丢弃末尾未完成的标签，避免浏览器在 parse 时反复回溯
+        const lastOpen = fixed.lastIndexOf("<");
+        const lastClose = fixed.lastIndexOf(">");
+        if (lastOpen > lastClose) {
+            fixed = fixed.slice(0, lastOpen);
+        }
+        // 简单闭合根节点，避免重复正则扫描
+        if (!/<\/svg>\s*$/i.test(fixed)) {
+            fixed += "</svg>";
+        }
+        return fixed;
+    }, []);
+
+    const flushStreamingSvgPreview = useCallback(() => {
+        streamingSvgFrameRef.current = null;
+        if (latestStreamingSvgRef.current === null) return;
+        try {
+            setStreamingSvgContent(latestStreamingSvgRef.current);
+            lastPreviewLengthRef.current = latestStreamingSvgRef.current.length;
+            lastPreviewAtRef.current = Date.now();
+        } catch (error) {
+            console.warn("应用 SVG 流式预览失败:", error);
+        }
+    }, [setStreamingSvgContent]);
+
+    const queueStreamingSvgPreview = useCallback((svg: string) => {
+        const normalized = normalizeStreamingSvg(svg);
+        if (!normalized) return;
+
+        // 低频节流：内容增长不明显且时间间隔很短时跳过，以避免浏览器在模型卡顿时频繁重绘
+        const now = Date.now();
+        const deltaLen = Math.abs(normalized.length - lastPreviewLengthRef.current);
+        const elapsed = now - lastPreviewAtRef.current;
+        const minDelta = 400; // 至少增长一定字符数再重绘
+        const minElapsed = 900; // 或者间隔达到一定时间
+        if (deltaLen < minDelta && elapsed < minElapsed) {
+            latestStreamingSvgRef.current = normalized; // 记录最新数据，稍后一次性刷新
+            return;
+        }
+
+        latestStreamingSvgRef.current = normalized;
+        if (streamingSvgFrameRef.current !== null) return;
+        // 在空闲时间优先更新，退化到 rAF
+        if (typeof window.requestIdleCallback === "function") {
+            idleCallbackIdRef.current = window.requestIdleCallback(() => {
+                flushStreamingSvgPreview();
+            }, { timeout: 800 });
+        } else {
+            streamingSvgFrameRef.current = window.requestAnimationFrame(flushStreamingSvgPreview);
+        }
+    }, [flushStreamingSvgPreview, normalizeStreamingSvg]);
+
+    useEffect(() => {
+        return () => {
+            if (streamingSvgFrameRef.current !== null) {
+                cancelAnimationFrame(streamingSvgFrameRef.current);
+            }
+            if (idleCallbackIdRef.current !== null && typeof window.cancelIdleCallback === "function") {
+                window.cancelIdleCallback(idleCallbackIdRef.current);
+            }
+        };
+    }, []);
 
     const fetchAndFormatDiagram = useCallback(
         async (options?: { saveHistory?: boolean }) => {
@@ -1483,17 +1554,30 @@ export default function ChatPanelOptimized({
                                     setInput={setInput}
                                     setFiles={handleFileChange}
                                     activeBranchId={activeBranchId}
-                                    onDisplayDiagram={(xml, {isFinal} = {}) => {
-                                        if (isSvgMode) {
+                                    onDisplayDiagram={(xml, { isFinal, mode } = {}) => {
+                                        const targetMode: DiagramRenderingMode = mode === "svg" ? "svg" : (isSvgMode ? "svg" : "drawio");
+
+                                        if (targetMode === "svg") {
                                             const fixed = repairSvg(xml);
 
                                             // 如果是流式更新，使用轻量级的预览层
                                             if (isFinal === false) {
-                                                setStreamingSvgContent(fixed);
+                                                queueStreamingSvgPreview(fixed);
                                                 return;
                                             }
 
                                             // 只有在最终完成时，才清除预览层并加载到编辑器状态
+                                            latestStreamingSvgRef.current = null;
+                                            if (streamingSvgFrameRef.current !== null) {
+                                                cancelAnimationFrame(streamingSvgFrameRef.current);
+                                                streamingSvgFrameRef.current = null;
+                                            }
+                                            if (idleCallbackIdRef.current !== null && typeof window.cancelIdleCallback === "function") {
+                                                window.cancelIdleCallback(idleCallbackIdRef.current);
+                                                idleCallbackIdRef.current = null;
+                                            }
+                                            lastPreviewLengthRef.current = 0;
+                                            lastPreviewAtRef.current = 0;
                                             setStreamingSvgContent(null);
                                             loadSvgMarkup(fixed, {
                                                 skipSnapshot: true,
