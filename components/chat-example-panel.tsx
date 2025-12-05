@@ -64,11 +64,12 @@ export default function ExamplePanel({
             ],
         },
         {
-            title: "SVG 可视化",
-            badge: "热门",
+            title: "SVG 动画",
             examples: [
-                { name: "数据看板", prompt: "为 B2B SaaS 仪表盘生成 SVG 销售看板：包含月度 ARR 折线、区域营收占比环形图" },
-                { name: "图标集", prompt: "为采购平台绘制特性图标：供应链、库存、合规、发票；统一风格、蓝灰配色" },
+                { name: "粒子星空", prompt: "用 SVG 生成一个粒子星空动画：100+ 大小不一的星星，带淡入淡出、缓慢移动效果，深蓝渐变背景" },
+                { name: "加载动画", prompt: "创建创意 SVG 加载动画：三个圆形依次缩放弹跳，渐变色从蓝到紫，循环播放" },
+                { name: "路径动画", prompt: "生成 SVG 路径描边动画：一个 Logo 或图标的线条逐渐显现，像手写一样的效果" },
+                { name: "数学曲线", prompt: "用 SVG 绘制美丽的参数方程曲线：玫瑰线或心形线，带彩虹渐变色，有呼吸动画" },
             ],
         },
     ];
